@@ -6,7 +6,7 @@
 
 ## System Overview
 
-SplitMate is a local-first group expense platform. The core data flow is:
+SplitMate is a local-first group expense app. The core data flow is:
 
 ```
 Bill Input (OCR / Manual / Upload)

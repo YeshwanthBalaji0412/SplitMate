@@ -63,8 +63,7 @@ Supports 6 real-world bill types + a general custom format:
 | Web | Next.js, TypeScript, Tailwind CSS |
 | Mobile | React Native + Expo |
 | Backend | Supabase (Postgres, Auth, Storage) |
-| OCR | Tesseract / PaddleOCR |
-| Local AI | Ollama (local LLMs for classification and insights) |
+| OCR | Google ML Kit (on-device, ~15MB, Android + iOS, zero network calls) |
 | Split Engine | Rule-based, deterministic, fully auditable |
 
 ---

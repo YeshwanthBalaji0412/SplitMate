@@ -26,7 +26,9 @@ Bill Input (OCR / Manual / Upload)
   Longitudinal Store → Group Intelligence Layer (MLE)
 ```
 
-Everything downstream of "Bill JSON Schema" is deterministic and rule-based. ML operates only upstream (parsing) and downstream (insights). The money math is never a black box.
+Everything downstream of "Bill JSON Schema" is deterministic and rule-based. The money math is never a black box.
+
+OCR uses **ML Kit on-device** (Google ML Kit, ~15MB, no network call) — raw text extraction happens locally and privately. Your parsing and classification logic converts that raw text into structured bill JSON. No image ever leaves the device.
 
 ---
 
@@ -208,6 +210,15 @@ Debt graph simplification using a min-flow algorithm:
 **Chose:** OCR is always a draft, confidence-gated user correction.
 **Why:** Trust is built by being quietly right and only asking when uncertain. Forcing full review kills the UX advantage of OCR.
 
+### ML Kit on-device vs Ollama vs Cloud LLM for OCR
+**Chose:** ML Kit on-device (Google ML Kit, ~15MB library).
+**Why three-way decision:**
+- **Ollama** cannot run on Android or iOS — it is a desktop/server runtime. Not viable for a mobile-first product.
+- **Cloud LLM vision APIs** (OpenAI, Gemini) send receipt images to third-party servers retained for up to 30 days. Receipts contain card digits, locations, purchase patterns — sensitive financial data. This violates our privacy-first principle and our users' reasonable expectations.
+- **ML Kit** runs fully on-device, works on Android and iOS natively, adds ~15MB to app size, requires no network call, and keeps every receipt image on the user's device permanently.
+
+The parsing intelligence lives in our code (text → structured bill JSON), not in a heavyweight model. This is more controllable, testable, and auditable than prompt-engineering a vision model.
+
 ---
 
 ## System Thinking Log
@@ -220,3 +231,4 @@ Debt graph simplification using a min-flow algorithm:
 | 2026-05-10 | Local-first with optional Supabase sync | Privacy + zero-friction onboarding without sacrificing group sync capability |
 | 2026-05-10 | India + USA only, no cross-currency | Scope control; cross-currency adds dispute surface and exchange rate complexity |
 | 2026-05-10 | Pre-bill rule templates for recurring types | Eliminates repeated data entry for utility/subscription bills — key friction point |
+| 2026-05-11 | ML Kit on-device OCR, not Ollama or cloud LLM | Ollama doesn't run on mobile; cloud LLMs retain receipt images (sensitive data); ML Kit is private, ~15MB, on-device, Android + iOS |

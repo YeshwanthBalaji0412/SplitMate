@@ -29,10 +29,11 @@
 
 **Bill Entry — Manual + Photo OCR**
 - Manual entry always works, no AI required
-- Photo/screenshot upload → Ollama local OCR → confidence-scored draft → user reviews flagged fields only
+- Photo/screenshot upload → Google ML Kit on-device OCR → confidence-scored draft → user reviews flagged fields only
+- ML Kit runs fully on Android and iOS, ~15MB, zero network calls — receipt images never leave the device
 - All paths produce the same bill JSON — OCR is a pre-fill, never the final word
 
-*Rationale:* PDF upload is cut from MVP. Photo covers restaurant bills, grocery receipts, delivery screenshots. PDFs are e-bills — useful but not day-one critical. Manual entry ensures the product works even when OCR is bad. Two modalities is enough to launch.
+*Rationale:* PDF upload is cut from MVP. Photo covers restaurant bills, grocery receipts, delivery screenshots. Manual entry ensures the product works even when OCR is uncertain. ML Kit chosen over Ollama (can't run on mobile) and cloud LLM APIs (retain receipt images up to 30 days — unacceptable for sensitive financial data). Keeping the app lite and private is non-negotiable for our audience.
 
 ---
 
@@ -169,7 +170,8 @@
 | Feature | Why never |
 |---|---|
 | Tax computation / liability | Compliance product — we allocate taxes already on the bill, never generate them |
-| Cloud LLM OCR (OpenAI vision etc.) | Receipt images contain sensitive financial data; cloud APIs retain inputs up to 30 days. Ollama only. |
+| Cloud LLM OCR (OpenAI vision etc.) | Receipt images contain sensitive financial data; cloud APIs retain inputs up to 30 days. On-device ML Kit only. |
+| Ollama for mobile OCR | Ollama is a desktop/server runtime — cannot run on Android or iOS. |
 | Cross-currency / FX rates | Out of scope — India + USA only, groups are single-currency |
 | In-app payments / wallets | Regulatory and fraud surface too large for this team and this product |
 | Multi-language UI | Post V2 — focus on English for India and US markets first |

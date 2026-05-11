@@ -15,8 +15,15 @@ Work in this order. Nothing in V1 or V2 is worth touching until these are solid.
 
 The entire MLE value proposition starts here. Goal: take a photo or screenshot of a receipt and produce a confidence-scored bill JSON draft that maps to the agreed schema.
 
+**OCR approach: Google ML Kit (on-device)**
+- Runs fully on Android and iOS natively — no network call, no image ever leaves the device
+- Adds ~15MB to app size — acceptable for our lite, privacy-first audience
+- Ollama ruled out: cannot run on mobile (desktop/server runtime only)
+- Cloud LLM vision APIs ruled out: providers retain receipt images up to 30 days — violates privacy-first principle
+- ML Kit extracts raw text lines; our parsing logic converts that into structured bill JSON — intelligence lives in code, not a model
+
 Steps:
-- Evaluate Ollama models for receipt OCR: **phi-3-vision**, **llava**, **moondream** — test on real India and US receipts across all 4 MVP bill types
+- Integrate ML Kit text recognition in React Native via `@react-native-ml-kit/text-recognition`
 - Build country-aware post-processing: India (CGST/SGST detection, ₹ symbol, GST-inclusive MRP flag) vs US (pre-tax item prices, additive sales tax)
 - Output schema: bill JSON with `confidence_scores` per field and `flagged_fields` array
 - Confidence threshold: fields below threshold go into `flagged_fields` — surfaced to user for correction. High-confidence fields pre-filled silently.
@@ -64,6 +71,20 @@ Metrics to track per user per group from day one:
 ---
 
 ## Design Decisions
+
+### 2026-05-11 — ML Kit on-device, not Ollama or cloud LLM
+
+**Decision:** OCR pipeline uses Google ML Kit running fully on-device. Ollama and cloud LLM vision APIs are ruled out.
+
+**Why Ollama is out:** Ollama is a desktop/server runtime — it cannot be bundled into a React Native Android or iOS app. Our product is mobile-first.
+
+**Why cloud LLM APIs are out:** Receipt images are sensitive financial data — card digits, merchant locations, purchase patterns. Cloud providers (OpenAI etc.) retain API inputs for up to 30 days by default. We cannot pipe user receipt photos to a third party without violating their reasonable privacy expectations. This is a firm product decision, not a cost decision.
+
+**Why ML Kit:** On-device, ~15MB, works natively on Android and iOS, zero network calls, no data retention risk. The raw text it extracts feeds our parsing and classification logic — the intelligence is in our code, not in the model.
+
+**Future:** Ollama remains relevant as an optional server-side enhanced parsing mode for a future desktop companion or self-hosted option. Not MVP.
+
+---
 
 ### 2026-05-10 — OCR is a draft, not a source of truth
 

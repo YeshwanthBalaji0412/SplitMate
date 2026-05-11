@@ -2,6 +2,54 @@
 
 **Owner:** Sruthi (ML Engineering Lead)
 **Scope:** OCR pipeline, item classification, confidence scoring, longitudinal intelligence, spending analytics
+**Roadmap reference:** [PLAN.md](PLAN.md)
+
+---
+
+## Where to Start — MVP Priorities
+
+Work in this order. Nothing in V1 or V2 is worth touching until these are solid.
+
+### 1. OCR Pipeline — Photo → Bill JSON Draft
+**Branch:** `data_schema` (off `dev`)
+
+The entire MLE value proposition starts here. Goal: take a photo or screenshot of a receipt and produce a confidence-scored bill JSON draft that maps to the agreed schema.
+
+Steps:
+- Evaluate Ollama models for receipt OCR: **phi-3-vision**, **llava**, **moondream** — test on real India and US receipts across all 4 MVP bill types
+- Build country-aware post-processing: India (CGST/SGST detection, ₹ symbol, GST-inclusive MRP flag) vs US (pre-tax item prices, additive sales tax)
+- Output schema: bill JSON with `confidence_scores` per field and `flagged_fields` array
+- Confidence threshold: fields below threshold go into `flagged_fields` — surfaced to user for correction. High-confidence fields pre-filled silently.
+- A parse failure outputs an empty draft with all fields flagged — never a crash, always manual entry fallback
+
+**Blocker to resolve first:** SWE needs to add `parse_metadata JSONB` column to `receipt_assets` table — this is where confidence scores land. Flag this before writing pipeline output code.
+
+### 2. Item Classifier — Line Type Detection
+**Depends on:** OCR pipeline producing raw line text
+
+For each line on a parsed receipt, classify it as:
+`item | tax_line | fee_line | discount | tip | total | noise`
+
+Then for items: `food | alcohol | non_taxable | other`
+
+This classification drives which allocation rule applies. An alcohol line goes to alcohol claimants only. A tax line feeds the fee rule engine with the correct applicability scope.
+
+### 3. Country-Aware Field Extraction
+**Depends on:** Item classifier
+
+- India: detect CGST + SGST as a pair → aggregate as single GST line. Flag MRP-inclusive prices. Detect service charge vs tip.
+- US: detect state sales tax line. Detect tip line. Item prices are pre-tax — no adjustment needed.
+- Both: extract merchant name, date, total, subtotal, individual line items with quantities and unit prices.
+
+### 4. Spending Personality Algorithm (V1 — build data pipeline now)
+Even though Spending Personality ships in V1, the data it needs comes from MVP bills. Design the aggregation queries now so V1 is just a read on top of existing data — not a backfill.
+
+Metrics to track per user per group from day one:
+- Ratio of actual share paid vs computed fair share (fairness delta)
+- Category breakdown of claimed items
+- Days-to-settle per expense
+
+---
 
 ---
 

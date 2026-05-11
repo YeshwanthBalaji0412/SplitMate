@@ -2,6 +2,61 @@
 
 **Owner:** SWE Lead
 **Scope:** Architecture, frontend, backend, split engine, fee rule engine, settlement optimizer
+**Roadmap reference:** [PLAN.md](PLAN.md)
+
+---
+
+## Where to Start — MVP Priorities
+
+Work in this order. Schema gaps are blockers for MLE — resolve those first.
+
+### 1. Schema Gaps — Blockers Before Any Feature Work
+
+Six issues identified in the current `dev` schema that block MLE and core features. Fix these before building UI:
+
+| Gap | What's needed | Why it's a blocker |
+|---|---|---|
+| No `country` on `groups` | Add `country CHAR(2)` enum `IN\|US` | Tax rule engine and OCR parsing mode both need this |
+| No `bill_type` on `expenses` | Add `bill_type` enum distinct from `category` | Drives fee rule templates and OCR mode |
+| No `input_source` on `expenses` | Add `input_source` enum `ocr\|manual\|upload` | MLE needs this to track pipeline performance |
+| No `parse_metadata` on `receipt_assets` | Add `parse_metadata JSONB` | OCR confidence scores and flagged fields land here |
+| No settlement traceability | Add `settlement_expense_links` junction table | "You owe X from these bills" is impossible without it |
+| `buildExplanation` hardcodes `$` | Make currency-aware | Breaks entirely for INR |
+
+### 2. Fee Rule Engine — Enforce Discount Order-of-Ops
+Current engine applies charges by `position` order. This is not enough — discount ordering must be enforced in code regardless of position:
+
+```
+1. Item subtotals (from assignment)
+2. Discounts → applied to base, reduces what tax is calculated on
+3. Taxes → on post-discount base
+4. Fees → flat or proportional depending on type
+```
+
+Update `computeSplit` in `engine.ts` to enforce this sequence explicitly.
+
+### 3. Settlement Minimization Toggle
+Current `minimizeSettlements` always runs. Add group-level toggle:
+- **Optimized** (default): run minimizer, trace each transfer back to source expenses via `settlement_expense_links`
+- **Direct**: skip minimizer, each person pays exactly who they owe per expense
+
+### 4. Mobile App — React Native + Expo
+MVP is mobile-only (Android + iOS). Web app is post-MVP.
+
+Build order within mobile:
+1. Auth + group creation + invite code join
+2. Bill entry form (manual) for Restaurant and Food Delivery types first — highest frequency
+3. Swipe-to-claim item assignment UX
+4. Per-person explainability view
+5. Settlement view with traceability
+6. Photo upload → OCR draft review UX (coordinate schema with Sruthi)
+7. Grocery and Utilities bill types + utility rule templates
+
+### 5. Utility Rule Templates
+Users set split rules once per group for utility bills — stored as a template, applied automatically on new bills of that type. Needs a `bill_rule_templates` table:
+- `group_id`, `bill_type`, `rules JSONB`, `created_by`, `created_at`
+
+---
 
 ---
 

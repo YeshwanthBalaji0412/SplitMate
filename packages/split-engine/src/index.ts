@@ -1,3 +1,3 @@
-export { computeSplit } from './engine';
-export { minimizeSettlements } from './settlement';
+export { computeSplit, formatAmount } from './engine';
+export { minimizeSettlements, computeGroupNetBalances } from './settlement';
 export type { SplitEngineOptions } from './engine';

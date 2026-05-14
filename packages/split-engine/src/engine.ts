@@ -223,7 +223,7 @@ export function computeSplit(
     const itemSubtotal = Math.round((subtotals.get(uid) ?? 0) * factor) / factor;
     const chargeBreakdown = chargeBreakdownMap.get(uid) ?? [];
 
-    const explanation = buildExplanation(itemSubtotal, chargeBreakdown, totalOwed);
+    const explanation = buildExplanation(itemSubtotal, chargeBreakdown, totalOwed, expense.currency);
 
     breakdown.push({ userId: uid, itemSubtotal, chargeBreakdown, totalOwed, explanation });
   }
@@ -247,23 +247,36 @@ export function computeSplit(
   };
 }
 
+// ─── Currency formatting ─────────────────────────────────────────────────────
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$',
+  INR: '₹',
+};
+
+export function formatAmount(amount: number, currency: string): string {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? currency + ' ';
+  return `${symbol}${Math.abs(amount).toFixed(2)}`;
+}
+
 // ─── Explanation builder ──────────────────────────────────────────────────────
 
 function buildExplanation(
   itemSubtotal: number,
   chargeBreakdown: PersonBreakdown['chargeBreakdown'],
-  totalOwed: number
+  totalOwed: number,
+  currency: string
 ): string {
   const parts: string[] = [];
 
   if (itemSubtotal > 0) {
-    parts.push(`Items: $${itemSubtotal.toFixed(2)}`);
+    parts.push(`Items: ${formatAmount(itemSubtotal, currency)}`);
   }
 
   for (const c of chargeBreakdown) {
     const sign = c.amount < 0 ? '-' : '+';
-    parts.push(`${c.label}: ${sign}$${Math.abs(c.amount).toFixed(2)}`);
+    parts.push(`${c.label}: ${sign}${formatAmount(c.amount, currency)}`);
   }
 
-  return `${parts.join(', ')} = $${totalOwed.toFixed(2)} total`;
+  return `${parts.join(', ')} = ${formatAmount(totalOwed, currency)} total`;
 }

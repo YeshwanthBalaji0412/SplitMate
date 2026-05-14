@@ -16,6 +16,8 @@ export interface User {
 // ─── Groups ──────────────────────────────────────────────────────────────────
 
 export type GroupType = 'trip' | 'roommates' | 'household' | 'event' | 'other';
+export type CountryCode = 'IN' | 'US';
+export type SettlementMode = 'optimized' | 'direct';
 
 export interface Group {
   id: string;
@@ -23,6 +25,8 @@ export interface Group {
   description?: string;
   type: GroupType;
   currency: string; // ISO 4217, e.g. "USD"
+  country: CountryCode; // drives tax rules + OCR parsing mode
+  settlementMode: SettlementMode; // optimized = minimize transactions, direct = pay per expense
   createdBy: string; // userId
   inviteCode: string;
   createdAt: string;
@@ -53,6 +57,15 @@ export type ExpenseCategory =
 
 export type ExpenseStatus = 'draft' | 'active' | 'settled';
 
+export type BillType =
+  | 'restaurant'
+  | 'grocery'
+  | 'delivery'
+  | 'accommodation'
+  | 'utility'
+  | 'subscription'
+  | 'custom';
+
 export interface Expense {
   id: string;
   groupId: string;
@@ -61,6 +74,7 @@ export interface Expense {
   totalAmount: number; // grand total (after all charges)
   currency: string;
   category: ExpenseCategory;
+  billType: BillType; // drives fee rule templates + OCR mode (distinct from category)
   paidBy: string; // userId
   date: string; // ISO 8601 date
   receiptAssetId?: string;
@@ -170,6 +184,28 @@ export interface Settlement {
   notes?: string;
   settledAt?: string;
   createdAt: string;
+}
+
+// ─── Settlement Expense Links (traceability) ────────────────────────────────
+
+export interface SettlementExpenseLink {
+  id: string;
+  settlementId: string;
+  expenseId: string;
+  amountFromExpense: number; // how much of this settlement came from this expense
+}
+
+// ─── Bill Rule Templates (recurring rules) ──────────────────────────────────
+
+export interface BillRuleTemplate {
+  id: string;
+  groupId: string;
+  billType: BillType;
+  name: string;
+  rules: Record<string, unknown>; // flexible JSONB — split rules per member
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Receipt Asset ────────────────────────────────────────────────────────────

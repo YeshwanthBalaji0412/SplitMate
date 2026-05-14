@@ -11,6 +11,7 @@ const makeExpense = (overrides: Partial<Expense> = {}): Expense => ({
   totalAmount: 100,
   currency: 'USD',
   category: 'food',
+  billType: 'restaurant',
   paidBy: 'user-A',
   date: '2026-03-31',
   status: 'active',

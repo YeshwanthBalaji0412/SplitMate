@@ -1,0 +1,68 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parser snapshots — real receipts > in-delivery-01: Indian delivery receipt (no GST line, container charge) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 30,
+      "confidence": 0.9,
+      "label": "Container Charge",
+      "type": "service_fee",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.6,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "IN",
+  "date": null,
+  "flaggedFields": [
+    "merchantName",
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Chicken Wings (4 Pc)",
+      "quantity": 1,
+      "totalPrice": 150,
+      "unitPrice": 150,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Garlic Mayonnaise",
+      "quantity": 1,
+      "totalPrice": 30,
+      "unitPrice": 30,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Peri Peri French Fries",
+      "quantity": 1,
+      "totalPrice": 120,
+      "unitPrice": 120,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Special Chicken Shawarma In Rumali",
+      "quantity": 1,
+      "totalPrice": 130,
+      "unitPrice": 130,
+    },
+  ],
+  "merchantName": null,
+  "subtotal": 430,
+  "total": 460,
+}
+`;

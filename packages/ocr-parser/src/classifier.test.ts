@@ -66,6 +66,16 @@ describe('classifyLines — noise', () => {
     const result = classifyLines(lines(['Mainland China', 'GSTIN: 27AABCU9603R1ZX']));
     expect(result[1].lineType).toBe('noise');
   });
+
+  it('classifies column header row as noise', () => {
+    const result = classifyLines(lines(['Item Qty. Price Amount', 'Butter Chicken 320']));
+    expect(result[0].lineType).toBe('noise');
+  });
+
+  it('classifies description/rate/amount header as noise', () => {
+    const result = classifyLines(lines(['Description Qty Rate Amount', 'Burger 200']));
+    expect(result[0].lineType).toBe('noise');
+  });
 });
 
 // ─── classifyLines — merchant_name ───────────────────────────────────────────
@@ -159,6 +169,16 @@ describe('classifyLines — fee_line', () => {
     const result = classifyFirst(['UberEats', 'Convenience Fee  2.99']);
     expect(result[1].lineType).toBe('fee_line');
   });
+
+  it('classifies container charge (Indian delivery)', () => {
+    const result = classifyFirst(['Zomato', 'Container Charge  30.00']);
+    expect(result[1].lineType).toBe('fee_line');
+  });
+
+  it('classifies packaging charge', () => {
+    const result = classifyFirst(['Swiggy', 'Packaging Charge  20.00']);
+    expect(result[1].lineType).toBe('fee_line');
+  });
 });
 
 // ─── classifyLines — tip ──────────────────────────────────────────────────────
@@ -221,6 +241,41 @@ describe('classifyLines — subtotal and total', () => {
     // "Total" pattern checked before "Subtotal" in classifier
     const result = classifyFirst(['Cafe X', 'Total Amount Due  572.00']);
     expect(result[1].lineType).toBe('total');
+  });
+});
+
+// ─── classifyLines — multi-line item merging ──────────────────────────────────
+
+describe('classifyLines — multi-line item merging', () => {
+  it('merges a wrapped item name across two lines', () => {
+    const result = classifyLines([
+      { text: 'Zomato Order', position: 0 },       // merchant — never merged
+      { text: 'Special Chicken', position: 1 },     // no price — should merge with next
+      { text: 'Shawarma In Rumali 1 130.00 130.00', position: 2 },
+    ]);
+    const items = result.filter((r) => r.lineType === 'item');
+    expect(items).toHaveLength(1);
+    expect(items[0].raw.text).toContain('Special Chicken');
+    expect(items[0].raw.text).toContain('Shawarma In Rumali');
+  });
+
+  it('does not merge two lines that both have prices', () => {
+    const result = classifyLines([
+      { text: 'Cafe', position: 0 },
+      { text: 'Butter Chicken 320', position: 1 },
+      { text: 'Garlic Naan 80', position: 2 },
+    ]);
+    const items = result.filter((r) => r.lineType === 'item');
+    expect(items).toHaveLength(2);
+  });
+
+  it('does not merge merchant name with first item', () => {
+    const result = classifyLines([
+      { text: 'Zomato', position: 0 },
+      { text: 'Butter Chicken 320', position: 1 },
+    ]);
+    expect(result[0].lineType).toBe('merchant_name');
+    expect(result[1].lineType).toBe('item');
   });
 });
 

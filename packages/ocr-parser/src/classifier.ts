@@ -32,6 +32,8 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\bplatform\s*fee\b/i,
     /\bservice\s*(fee|charge)\b/i,
     /\bpacking\s*(fee|charge)?\b/i,
+    /\bpackaging\s*(fee|charge)?\b/i,
+    /\bcontainer\s*(fee|charge)?\b/i,
     /\bconvenience\s*fee\b/i,
     /\bsurge\b/i,
     /\bhandling\s*fee\b/i,
@@ -80,6 +82,10 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\b(gstin|fssai|cin)\b/i,          // registration numbers
     /^\*+$/,                            // separator lines like ****
     /^[-=]+$/,                          // separator lines like ----
+    // Column header rows — "Item Qty Price Amount", "Description Rate Amt" etc.
+    /\b(qty|quantity)\b.{0,30}\b(price|amount|rate|amt)\b/i,
+    /\bitem\b.{0,20}\b(qty|price|amount)\b/i,
+    /\bdescription\b.{0,30}\b(qty|rate|amount)\b/i,
   ],
 };
 
@@ -159,20 +165,63 @@ function classifyLine(line: RawLine, isFirstLine: boolean): ClassifiedLine {
   return { raw: line, lineType: 'noise', confidence: 0.40 };
 }
 
+// ─── Multi-line item merging ──────────────────────────────────────────────────
+// When ML Kit wraps a long item name across two lines, line N has no price
+// but line N+1 does. Merge them so the extractor sees one complete line.
+function mergeWrappedLines(lines: RawLine[]): RawLine[] {
+  const merged: RawLine[] = [];
+  let i = 0;
+
+  // Find the index of the first non-empty line — never merge it.
+  // It's the merchant name, not a wrapped item continuation.
+  let firstContentIdx = 0;
+  for (let j = 0; j < lines.length; j++) {
+    if (lines[j].text.trim().length > 0) { firstContentIdx = j; break; }
+  }
+
+  while (i < lines.length) {
+    const current = lines[i];
+    const next = lines[i + 1];
+    const currentHasPrice = extractPrice(current.text) !== null;
+    const nextHasPrice = next ? extractPrice(next.text) !== null : false;
+    const currentHasText = current.text.trim().length > 0;
+    const isFirstLine = i === firstContentIdx;
+
+    // Merge only if: not the first line, no price, has text, next has a price,
+    // and current line looks like a name fragment (letters present, not a separator).
+    const looksLikeName = /[a-zA-Zऀ-ॿ]/.test(current.text) && !/^[-=*]+$/.test(current.text.trim());
+    if (!isFirstLine && !currentHasPrice && currentHasText && nextHasPrice && looksLikeName) {
+      merged.push({
+        text: `${current.text.trim()} ${next.text.trim()}`,
+        position: current.position,
+        boundingBox: current.boundingBox,
+      });
+      i += 2;
+    } else {
+      merged.push(current);
+      i++;
+    }
+  }
+  return merged;
+}
+
 export function classifyLines(lines: RawLine[]): ClassifiedLine[] {
   // Sort by vertical position — top of receipt first
   const sorted = [...lines].sort((a, b) => a.position - b.position);
 
+  // Merge wrapped item names before classifying
+  const preMerged = mergeWrappedLines(sorted);
+
   // Skip leading noise to find the actual first content line (merchant name)
   let firstContentIdx = 0;
-  for (let i = 0; i < sorted.length; i++) {
-    if (sorted[i].text.trim().length > 0) {
+  for (let i = 0; i < preMerged.length; i++) {
+    if (preMerged[i].text.trim().length > 0) {
       firstContentIdx = i;
       break;
     }
   }
 
-  return sorted.map((line, idx) =>
+  return preMerged.map((line, idx) =>
     classifyLine(line, idx === firstContentIdx)
   );
 }

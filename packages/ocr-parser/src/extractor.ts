@@ -44,10 +44,17 @@ function extractQuantityAndName(text: string): { quantity: number; name: string 
 }
 
 function cleanItemName(rawText: string, price: number): string {
-  // Remove trailing price from item name
+  // Receipt rows from ML Kit arrive as one line: "Name  Qty  UnitPrice  TotalPrice"
+  // Strip the trailing price first, then any remaining trailing numbers (qty, unit price).
   const priceStr = price.toString();
   const withSymbol = new RegExp(`\\s*[₹$]?\\s*${priceStr.replace('.', '\\.')}\\s*$`);
-  return rawText.replace(withSymbol, '').trim();
+  let cleaned = rawText.replace(withSymbol, '').trim();
+
+  // Strip trailing standalone numbers that represent qty/unit-price columns.
+  // Stop when what remains looks like a real item name (contains a letter).
+  cleaned = cleaned.replace(/(\s+\d+(?:\.\d{1,2})?)+$/, '').trim();
+
+  return cleaned;
 }
 
 // ─── Charge label builders ────────────────────────────────────────────────────
@@ -69,7 +76,7 @@ function buildChargeType(label: string, country: Country): string {
   if (/delivery/.test(l)) return 'delivery_fee';
   if (/platform/.test(l)) return 'platform_fee';
   if (/service.?fee|convenience/.test(l)) return 'service_fee';
-  if (/packing|packaging/.test(l)) return 'service_fee';
+  if (/packing|packaging|container/.test(l)) return 'service_fee';
   if (/tip|gratuity|service.?charge/.test(l)) return 'gratuity';
   if (/discount|promo|coupon|off\b|savings?|cashback/.test(l)) return 'discount';
   return 'custom';
@@ -327,11 +334,10 @@ function average(nums: number[]): number {
   return round2(nums.reduce((a, b) => a + b, 0) / nums.length);
 }
 
-function cleanChargeLabel(text: string, amount: number): string {
-  // Remove the trailing price from the label
-  const priceStr = Math.abs(amount).toString();
+function cleanChargeLabel(text: string, _amount: number): string {
+  // Remove trailing price (any format: 30, 30.00, ₹30, $30.00)
   return text
-    .replace(new RegExp(`[₹$]?\\s*${priceStr.replace('.', '\\.')}\\s*$`), '')
+    .replace(/\s*[₹$]?\s*\d{1,6}(?:[.,]\d{1,2})?\s*$/, '')
     .replace(/[-]\s*$/, '')
     .trim();
 }

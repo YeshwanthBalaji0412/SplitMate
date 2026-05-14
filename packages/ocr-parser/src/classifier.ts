@@ -96,7 +96,8 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\bdistrict\b|\bpincode\b|\bpin\s*code\b|\bcbe\b|\bcoimbatore\b/i,
     /\b(ph|phone|mob|mobile|tel|fax)\s*(no|num|number)?[\s:.]/i,
     /\bpin\s*:/i,                       // "PIN: 068 78 715"
-    /^\+\d[\d\s\-()]{7,}/,             // phone numbers starting with + country code
+    /^\+\d[\d\s\-()]{7,}/,             // "+1 312-766-8835"
+    /^\(\d{3}\)\s*\d{3}[-\s]\d{4}/,    // "(215) 491-1617" US phone format
     // Bill/receipt metadata
     /\bbill\s*no\b|\breceipt\s*no\b|\binvoice\s*no\b/i,
     /\btime\s*:/i,                      // TIME: 18:25
@@ -118,6 +119,17 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\bdon'?t\s+forget\b/i,           // order notes: "don't forget the garlic aioli"
     // Order/tracking codes — short alphanumeric strings (F0006, #12345)
     /^[A-Z]?\d{3,6}$|^#\d+$/i,        // "F0006", "#190"
+    // Barcodes — long all-digit strings
+    /^\d{8,}$/,                         // "1234567890012"
+    // Store/location identifiers
+    /\bst[#\s]*\d+\b|\bstore\s*#?\s*\d+/i, // "St##1 1693", "Store #1693"
+    // Lines starting with # or ## (OCR artifacts from bold/large text)
+    /^#{2,}/,                           // "###ington PA..."
+    // Exemption/zero-tax lines
+    /\b(general\s*ex(em|empt?)|tax\s*ex(em|empt?))\b/i,
+    // Promotional taglines with store brand
+    /\bwhere\s+every/i,                 // "Where Everything's $1.00"
+    /\bshop\s+on.?line\b/i,            // "Now Shop On-Line at..."
     // Item modifier lines — start with "- " (customization options)
     /^\s*-\s+[A-Za-z]/,               // "- Medium", "- House Special..."
     // Delivery platform labels
@@ -140,8 +152,9 @@ const PATTERNS: Record<LineType, RegExp[]> = {
 // ─── Price extraction helper ──────────────────────────────────────────────────
 
 // Matches optional negative sign, optional currency symbol, then the number.
-// Allows trailing * (grocery discount marker) and trailing whitespace.
-const PRICE_RE = /(-?)\s*[₹$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d{1,6}(?:\.\d{1,2})?)[\s*]*$/;
+// Allows trailing: * (grocery discount marker), single alpha (N=non-taxable,
+// T=taxable, F=food-exempt on POS systems), and trailing whitespace.
+const PRICE_RE = /(-?)\s*[₹$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d{1,6}(?:\.\d{1,2})?)[\s*]*[NTFX]?\s*$/;
 
 export function extractPrice(text: string): number | null {
   const match = text.match(PRICE_RE);
@@ -244,12 +257,28 @@ function mergeWrappedLines(lines: RawLine[]): RawLine[] {
   const merged: RawLine[] = [];
   let i = 0;
 
-  // Find the index of the first non-empty line — never merge it.
-  // It's the merchant name, not a wrapped item continuation.
-  let firstContentIdx = 0;
+  // Find first two non-empty content lines — never merge either of them.
+  // Line 1 is the merchant name; line 2 may be a merchant name continuation.
+  let firstContentIdx = -1;
+  let secondContentIdx = -1;
   for (let j = 0; j < lines.length; j++) {
-    if (lines[j].text.trim().length > 0) { firstContentIdx = j; break; }
+    if (lines[j].text.trim().length > 0) {
+      if (firstContentIdx === -1) firstContentIdx = j;
+      else if (secondContentIdx === -1) {
+        // Protect second line only if both are short pure-text lines (1-2 words each)
+        // indicating a genuine two-line merchant name like "Green" + "Supermarket".
+        const firstLine = lines[firstContentIdx].text.trim();
+        const firstWords = firstLine.split(/\s+/).length;
+        const secondWords = lines[j].text.trim().split(/\s+/).length;
+        const isShortPair = isMerchantContinuation(lines[j])
+          && /^[A-Za-z\s&',.-]+$/.test(firstLine)
+          && firstWords <= 2 && secondWords === 1; // second must be single word
+        if (isShortPair) secondContentIdx = j;
+        break;
+      }
+    }
   }
+  if (firstContentIdx === -1) firstContentIdx = 0;
 
   while (i < lines.length) {
     const current = lines[i];
@@ -261,13 +290,14 @@ function mergeWrappedLines(lines: RawLine[]): RawLine[] {
 
     // Merge only if: not the first line, no price, has text, next has a price,
     // current looks like a name fragment (has letters, not a separator or keyword line).
+    const isProtectedLine = i === firstContentIdx || i === secondContentIdx;
     const looksLikeName = /[a-zA-Zऀ-ॿ]/.test(current.text)
       && !/^[-=*]+$/.test(current.text.trim())
-      && !matchesAny(current.text, PATTERNS.noise)      // skip known noise lines
-      && !matchesAny(current.text, PATTERNS.tax_line)   // skip tax headers
+      && !matchesAny(current.text, PATTERNS.noise)
+      && !matchesAny(current.text, PATTERNS.tax_line)
       && !matchesAny(current.text, PATTERNS.subtotal)
       && !matchesAny(current.text, PATTERNS.total);
-    if (!isFirstLine && !currentHasPrice && currentHasText && nextHasPrice && looksLikeName) {
+    if (!isProtectedLine && !currentHasPrice && currentHasText && nextHasPrice && looksLikeName) {
       merged.push({
         text: `${current.text.trim()} ${next.text.trim()}`,
         position: current.position,
@@ -282,6 +312,14 @@ function mergeWrappedLines(lines: RawLine[]): RawLine[] {
   return merged;
 }
 
+// Detect merchant name continuation: a line that is pure text (no digits)
+// appearing immediately after the first content line.
+// e.g. "Green" → "Supermarket" — both are the merchant name split across two lines.
+function isMerchantContinuation(line: RawLine): boolean {
+  const text = line.text.trim();
+  return text.length > 0 && /^[A-Za-z\s&',.-]+$/.test(text);
+}
+
 export function classifyLines(lines: RawLine[]): ClassifiedLine[] {
   // Sort by vertical position — top of receipt first
   const sorted = [...lines].sort((a, b) => a.position - b.position);
@@ -289,16 +327,20 @@ export function classifyLines(lines: RawLine[]): ClassifiedLine[] {
   // Merge wrapped item names before classifying
   const preMerged = mergeWrappedLines(sorted);
 
-  // Skip leading noise to find the actual first content line (merchant name)
-  let firstContentIdx = 0;
+  // Find first and second content lines for merchant name detection
+  let firstContentIdx = -1;
+  let secondContentIdx = -1;
   for (let i = 0; i < preMerged.length; i++) {
     if (preMerged[i].text.trim().length > 0) {
-      firstContentIdx = i;
-      break;
+      if (firstContentIdx === -1) firstContentIdx = i;
+      else if (secondContentIdx === -1) { secondContentIdx = i; break; }
     }
   }
 
-  return preMerged.map((line, idx) =>
-    classifyLine(line, idx === firstContentIdx)
-  );
+  return preMerged.map((line, idx) => {
+    // Second content line is merchant continuation if it's pure text
+    const isMerchantLine = idx === firstContentIdx ||
+      (idx === secondContentIdx && isMerchantContinuation(line));
+    return classifyLine(line, isMerchantLine);
+  });
 }

@@ -13,6 +13,24 @@ describe('parser snapshots — real receipts', () => {
     expect(draft).toMatchSnapshot();
   });
 
+  it('us-grocery-02: Green Supermarket (multi-line merchant, qty prefix items, no tax)', () => {
+    const draft = parseReceipt({
+      lines: loadFixture('us-grocery-02.txt'),
+      country: 'US',
+      billType: 'grocery',
+    });
+    expect(draft).toMatchSnapshot();
+  });
+
+  it('us-grocery-03: Dollar Tree (N-suffix prices, OCR noise, tagline with price)', () => {
+    const draft = parseReceipt({
+      lines: loadFixture('us-grocery-03.txt'),
+      country: 'US',
+      billType: 'grocery',
+    });
+    expect(draft).toMatchSnapshot();
+  });
+
   it('us-grocery-01: US grocery receipt (discounts, negative prices, payment lines, savings summary)', () => {
     const draft = parseReceipt({
       lines: loadFixture('us-grocery-01.txt'),

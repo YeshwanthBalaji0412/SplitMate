@@ -54,21 +54,38 @@ function extractQuantityAndName(text: string): { quantity: number; name: string 
     };
   }
 
+  // "2 APPLE" or "3 BANANA" — bare leading digit followed by name (grocery qty prefix)
+  const bareQtyMatch = text.match(/^(\d+)\s+([A-Za-z].*)$/);
+  if (bareQtyMatch) {
+    return {
+      quantity: parseInt(bareQtyMatch[1], 10),
+      name: bareQtyMatch[2].trim(),
+    };
+  }
+
   return { quantity: 1, name: text.trim() };
 }
 
-// Strip leading SI/serial number: "1 PAROTTA", "2 CHICKEN 65"
+// Strip leading SI/serial number — ONLY when the row has 3+ numeric tokens,
+// indicating a tabular format (SI | Name | Qty | Price | Amount).
+// "1 PAROTTA 9Pk 20.00 180.00" → 4 numeric tokens → strip SI
+// "2 APPLE 1.00" → 2 numeric tokens → leading digit is quantity, keep it
 function stripSerialNumber(text: string): string {
-  // Match a leading digit(s) followed by a space and then a letter — serial number
-  return text.replace(/^\d+\s+(?=[A-Za-z])/, '').trim();
+  const numericTokenCount = (text.match(/\d+(?:[.,]\d+)?/g) ?? []).length;
+  if (numericTokenCount >= 3) {
+    return text.replace(/^\d+\s+(?=[A-Za-z])/, '').trim();
+  }
+  return text.trim();
 }
 
 function cleanItemName(rawText: string, price: number): string {
-  // Receipt rows from ML Kit arrive as one line: "Name  Qty  UnitPrice  TotalPrice"
+  // Strip single trailing alpha suffix used by POS systems (N=non-taxable, T=taxable, F=food)
+  let text = rawText.replace(/\s*[NTFX]\s*$/, '').trim();
+
   // Strip the trailing price (with or without currency symbol, integer or decimal).
   const priceStr = price.toString();
   const withSymbol = new RegExp(`\\s*[₹$]?\\s*${priceStr.replace('.', '\\.')}(?:\\.\\d{1,2})?\\s*$`);
-  let cleaned = rawText.replace(withSymbol, '').trim();
+  let cleaned = text.replace(withSymbol, '').trim();
 
   // Also strip any remaining trailing currency+price pattern not caught above
   cleaned = cleaned.replace(/\s*[₹$]\s*\d+(?:\.\d{1,2})?\s*$/, '').trim();
@@ -157,6 +174,9 @@ export function extractFields(
         if (!merchantName) {
           merchantName = text;
           conf.merchantName = cl.confidence;
+        } else {
+          // Second merchant_name line = multi-line merchant name (e.g. "Green" + "Supermarket")
+          merchantName = `${merchantName} ${text}`;
         }
         break;
       }

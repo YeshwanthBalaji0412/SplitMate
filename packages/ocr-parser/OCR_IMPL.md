@@ -34,7 +34,10 @@ ParsedBillDraft           ← JSON draft shown to user for review
 | `in-delivery-01.txt` | Food delivery | India | 5 issues (all fixed) |
 | `in-restaurant-01.txt` | Restaurant | India | 6 issues (5 fixed, 1 known limitation) |
 | `us-delivery-01.txt` | Food delivery (UberEats) | USA | 6 issues (all fixed) |
-| `us-delivery-02.txt` | Food delivery (UberEats+restaurant) | USA | 5 issues (4 fixed, 1 known limitation) |
+| `us-delivery-02.txt` | Food delivery (UberEats + Dig Inn) | USA | 5 issues (4 fixed, 1 known limitation) |
+| `us-grocery-01.txt` | Grocery — payment/savings section only | USA | 7 issues (all fixed) |
+| `us-grocery-02.txt` | Grocery — Green Supermarket, full items | USA | 4 issues (all fixed) |
+| `us-grocery-03.txt` | Grocery — Dollar Tree, N-suffix, OCR noise | USA | 6 issues (all fixed) |
 
 ---
 
@@ -250,6 +253,122 @@ Called before `extractQuantityAndName` in the item extraction flow.
 
 ---
 
+---
+
+### FIXED — Issue 23: Negative prices with `*` suffix not extracted
+**Receipt:** us-grocery-01.txt
+**Symptom:** Discount lines like `"WH/SDL GR GRAPES SCP -0.77 *"` had price extracted as `null`
+**Root cause:** `PRICE_RE` only matched positive numbers; `*` suffix after number blocked the match
+**Fix:** Updated `PRICE_RE` to include optional negative sign and optional trailing `*`: `/(-?)\s*[₹$]?\s*(\d...)[NTFX]?\s*$/`
+Also added: if `extractPrice < 0` and line doesn't match date patterns → classify as `discount` (confidence 0.82)
+
+---
+
+### FIXED — Issue 24: Payment method lines (EGift, Cash, Change) as items
+**Receipt:** us-grocery-01.txt
+**Symptom:** `EGift $10.00`, `Cash $0.41`, `Change $0.00` all appeared as food items
+**Root cause:** No payment method category in noise patterns
+**Fix:** Added general payment method pattern to `PATTERNS.noise`: `/^(egift|e-gift|gift\s*card|cash|credit|debit|visa|mastercard|amex|change|tender|paid)\b/i`
+
+---
+
+### FIXED — Issue 25: Savings summary lines as discounts / items
+**Receipt:** us-grocery-01.txt
+**Symptom:** `"Stop & Shop Card Savings $18.98"` → discount; `"***YEAR-TO-DATE SAVINGS*** $356.74"` → discount at $356.74 (wrecked totals)
+**Root cause:** Savings/loyalty program lines contain amounts and "savings" keyword that matched discount patterns
+**Fix:** Added noise patterns for savings summary lines: year-to-date, card savings, personal thanks, your-total-savings, total-stop-and-shop
+
+---
+
+### FIXED — Issue 26: Wrong total from savings summary
+**Receipt:** us-grocery-01.txt
+**Symptom:** `total: 24.04` (Your Total Savings) instead of `20.41` (Total after savings)
+**Root cause:** Parser took the first `total`-classified line. "Your Total Savings" matched total pattern before "Total after savings"
+**Fix:** Added `/\btotal\s*after\s*(savings?|discount)\b/i` as highest-priority total pattern. Added `/\byour\s*total\s*savings?\b/i` to noise — it's informational, not the bill total.
+
+---
+
+### FIXED — Issue 27: Section headers as merchant name
+**Receipt:** us-grocery-01.txt
+**Symptom:** `"END EASYSHOP ORDER"` → merchant name
+**Root cause:** First non-empty line is assumed to be merchant; section headers weren't filtered
+**Fix:** Added `/^(end|your|our)\s+\w.{3,}\s+(order|summary|section)\s*$/i` to `PATTERNS.noise`
+
+---
+
+### FIXED — Issue 28: Wrong subtotal from intermediate total
+**Receipt:** us-grocery-01.txt
+**Symptom:** `subtotal: 20.41` from first `Total 20.41` line (post-discount intermediate), not `$44.45` (pre-discount)
+**Root cause:** "Total before savings" not mapped to subtotal type
+**Fix:** Added `/\btotal\s*before\s*(savings?|discount)\b/i` to `PATTERNS.subtotal`
+
+---
+
+### FIXED — Issue 32: Multi-line merchant name merged with first item
+**Receipt:** us-grocery-02.txt
+**Symptom:** `"Supermarket 2 APPLE"` as one item; merchant `"Green"` only
+**Root cause:** `mergeWrappedLines` merged "Supermarket" (no price, pure text) with "2 APPLE 1.00" (has price)
+**Fix:** Added `isMerchantContinuation()` detection. When first AND second content lines are both short pure-text (≤2 words first, 1 word second), the second is marked as `merchant_name` and protected from merging. Extractor concatenates multiple merchant_name lines.
+
+---
+
+### FIXED — Issue 33: Leading quantity digit stripped as SI serial number
+**Receipt:** us-grocery-02.txt
+**Symptom:** `"2 APPLE 1.00"` → name `"APPLE"`, quantity `1` (leading `2` stripped as serial number)
+**Root cause:** `stripSerialNumber` stripped ANY leading digit before a letter
+**Fix:** `stripSerialNumber` now only fires when line has **3+ numeric tokens** (tabular format with SI|Name|Qty|Price|Amount). `"2 APPLE 1.00"` has 2 numeric tokens → digit is quantity, not serial.
+Also added bare quantity extraction: `"2 APPLE"` → `extractQuantityAndName` now handles `N WORD` prefix format.
+
+---
+
+### FIXED — Issue 34: Barcode extracted as item
+**Receipt:** us-grocery-02.txt
+**Symptom:** `"1234567890012"` → item with price `890012`
+**Root cause:** Long all-digit string matched price regex (trailing digits extracted)
+**Fix:** Added `/^\d{8,}$/` to `PATTERNS.noise` — barcodes are 8+ digit strings
+
+---
+
+### FIXED — Issue 35: `1.00N` POS tax suffix breaks price extraction
+**Receipt:** us-grocery-03.txt
+**Symptom:** All 8 Dollar Tree items had wrong names (`"#IST CRUNCHY CHZ 1 1.00 1.00N"`) — `N` blocked price extraction
+**Root cause:** `PRICE_RE` required line to end with a digit or whitespace. `N` (non-taxable marker) is appended by some POS systems after the price.
+**Fix:** `PRICE_RE` updated to allow optional single alpha suffix `[NTFX]` after the price. `cleanItemName` also strips trailing alpha suffix before price-matching.
+
+---
+
+### FIXED — Issue 36: US phone format `(215) 491-1617` extracted as negative discount
+**Receipt:** us-grocery-03.txt
+**Symptom:** `-1617` extracted from phone number → classified as discount
+**Root cause:** Existing phone noise pattern didn't match `(NXX) NXX-XXXX` format
+**Fix:** Added `/^\(\d{3}\)\s*\d{3}[-\s]\d{4}/` to `PATTERNS.noise`
+
+---
+
+### FIXED — Issue 37: Store number `St##1 1693` as item
+**Receipt:** us-grocery-03.txt
+**Symptom:** `"St##1 1693"` → item with price `1693`
+**Root cause:** OCR artifact `##` in store number prefix not in noise patterns
+**Fix:** Added `/\bst[#\s]*\d+\b|\bstore\s*#?\s*\d+/i` and `/^#{2,}/` to `PATTERNS.noise`
+
+---
+
+### FIXED — Issue 39: `GENERAL EXEM $0.00` as item
+**Receipt:** us-grocery-03.txt
+**Symptom:** Tax exemption line with zero value classified as item
+**Root cause:** No exemption line pattern in classifier
+**Fix:** Added `/\b(general\s*ex(em|empt?)|tax\s*ex(em|empt?))\b/i` to `PATTERNS.noise`
+
+---
+
+### FIXED — Issue 40: Promotional tagline `Where Everything's $1.00` as item
+**Receipt:** us-grocery-03.txt
+**Symptom:** Dollar Tree tagline classified as a $1 item
+**Root cause:** Ends with `$1.00` — item pattern matches
+**Fix:** Added `/\bwhere\s+every/i` and `/\bshop\s+on.?line\b/i` to `PATTERNS.noise`
+
+---
+
 ### KNOWN REMAINING — Issue 12: Tax data row (pure numeric) loses GST amount
 **Receipt:** in-restaurant-01.txt
 **Symptom:** `"5.00 771.43 19.29 19.29 38.57"` — pure numeric row correctly silenced as noise, but GST amount (38.57) is lost
@@ -266,8 +385,12 @@ Called before `extractQuantityAndName` in the item extraction flow.
 | No tax computation | We allocate taxes already on the bill — never generate them. Avoids compliance scope. |
 | OCR accuracy depends on image quality | ML Kit is best-effort. Low-confidence fields are always flagged for user review. |
 | 2-digit years ambiguous | `07/09/25` — we normalise to current century (20xx). Flagged for user review. |
+| Dates without year (UberEats) | `"Mon May 11 at 4:05 PM"` — no year, date always null, user fills in. |
 | Multi-currency not supported | India (INR) and USA (USD) only. No cross-currency groups. |
 | Handwritten receipts | Not supported in v1. ML Kit handles printed text only. |
+| Delivery platform as merchant name | Platform (Uber Eats, Swiggy) appears first; restaurant on line 4+. Future fix: scan for restaurant name after metadata is filtered. |
+| Tax table pair (Indian POS) | `TAX %... CGST SGST TAX AMOUNT` header + pure-numeric data row — GST amount lost. User adds manually. Future fix: parse header+data as a pair. |
+| Partial receipts | Receipts showing only payment/savings section have no items — flagged correctly, no false data added. |
 
 ---
 

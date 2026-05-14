@@ -174,3 +174,51 @@ exports[`parser snapshots — real receipts > us-delivery-01: UberEats receipt (
   "total": 406.28,
 }
 `;
+
+exports[`parser snapshots — real receipts > us-delivery-02: UberEats receipt (US, 2x quantity, delivery fee, order note block) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 2.4,
+      "confidence": 0.93,
+      "label": "Tax",
+      "rate": undefined,
+      "type": "state_tax",
+    },
+    {
+      "amount": 0.99,
+      "confidence": 0.9,
+      "label": "Delivery Fee",
+      "type": "delivery_fee",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.92,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.9,
+    "total": 0.7,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "total",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Classic Dig Bowl",
+      "quantity": 2,
+      "totalPrice": 27.08,
+      "unitPrice": 13.54,
+    },
+  ],
+  "merchantName": "Uber Eats #9E273",
+  "subtotal": 27.08,
+  "total": 30.47,
+}
+`;

@@ -13,6 +13,16 @@ describe('parser snapshots — real receipts', () => {
     expect(draft).toMatchSnapshot();
   });
 
+  it('us-delivery-02: UberEats receipt (US, 2x quantity, delivery fee, order note block)', () => {
+    const draft = parseReceipt({
+      lines: loadFixture('us-delivery-02.txt'),
+      country: 'US',
+      billType: 'delivery',
+    });
+
+    expect(draft).toMatchSnapshot();
+  });
+
   it('us-delivery-01: UberEats receipt (US, single item with modifiers, tax additive)', () => {
     const draft = parseReceipt({
       lines: loadFixture('us-delivery-01.txt'),

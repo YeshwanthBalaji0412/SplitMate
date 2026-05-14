@@ -34,6 +34,7 @@ ParsedBillDraft           ← JSON draft shown to user for review
 | `in-delivery-01.txt` | Food delivery | India | 5 issues (all fixed) |
 | `in-restaurant-01.txt` | Restaurant | India | 6 issues (5 fixed, 1 known limitation) |
 | `us-delivery-01.txt` | Food delivery (UberEats) | USA | 6 issues (all fixed) |
+| `us-delivery-02.txt` | Food delivery (UberEats+restaurant) | USA | 5 issues (4 fixed, 1 known limitation) |
 
 ---
 
@@ -207,6 +208,45 @@ Called before `extractQuantityAndName` in the item extraction flow.
 **Root cause:** UberEats prints relative date with day-of-week and time but no year
 **Behaviour:** `date` flagged for user input. Correct — we cannot infer the year reliably.
 **Future:** Could infer year from current date if date is within ±7 days. Not worth the complexity for v1.
+
+---
+
+---
+
+### FIXED — Issue 19: PIN line parsed as item
+**Receipt:** us-delivery-02.txt
+**Symptom:** `"+1 312-766-8835 PIN: 068 78 715"` → item with price `715`
+**Root cause:** `PIN:` not in phone noise patterns; `715` at end matched price regex
+**Fix:** Added `/\bpin\s*:/i` and `/^\+\d[\d\s\-()]{7,}/` to `PATTERNS.noise`
+
+---
+
+### FIXED — Issue 20: Order note continuation merged with item
+**Receipt:** us-delivery-02.txt
+**Symptom:** `"don't forget the garlic aioli 2x Classic Dig Bowl $27.08"` — note line merged with item. Quantity `2` missed, item name corrupted.
+**Root cause:** `"don't forget..."` passed `looksLikeName` check (has letters, not separator), merged with next price-bearing line. `ORDER NOTE` header not in noise patterns.
+**Fix:** Added to `PATTERNS.noise`:
+- `/\border\s*(details?|note)\b/i` — catches ORDER NOTE header
+- `/\breturn\s*customer\b/i` — order note body
+- `/\bdon'?t\s+forget\b/i` — order note body
+- `/\bdelivery\s*date\s*:/i`, `/\breceived\s*:/i`, `/\binternal\s*id\b/i` — other metadata
+
+---
+
+### FIXED — Issue 22: Total null when no explicit Total line
+**Receipt:** us-delivery-02.txt
+**Symptom:** `total: null` — UberEats receipt shows subtotal + individual charges but no "Grand Total" line
+**Root cause:** Parser only populated `total` from explicit `total`-classified lines
+**Fix:** Added total inference in `extractFields`: when `total === null && subtotal !== null && charges.length > 0`, compute `total = subtotal + sum(non-gstInclusive charges)`. Confidence set to `0.70` (lower than explicit `0.92`) so it's flagged for user confirmation.
+
+---
+
+### ACCEPTED LIMITATION — Issue 21: Platform name as merchant (delivery app receipts)
+**Receipt:** us-delivery-02.txt
+**Symptom:** `merchantName: "Uber Eats #9E273"` — actual restaurant `"Dig Inn"` appears on line 4, not line 1
+**Root cause:** Delivery platform receipts print platform name first, restaurant name second. Our first-line merchant heuristic picks up the platform.
+**Behaviour:** `merchantName` is flagged (confidence 0.80 < default threshold... actually 0.80 > 0.75 so not flagged). User must manually correct to "Dig Inn".
+**Future fix:** For `billType: delivery`, scan for a second restaurant-name-like line after platform metadata is filtered, and prefer it over the first line.
 
 ---
 

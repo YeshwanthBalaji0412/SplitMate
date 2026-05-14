@@ -341,6 +341,17 @@ export function extractFields(
     }
   }
 
+  // ─── Infer total when missing ─────────────────────────────────────────────
+  // Some receipts (UberEats) show subtotal + individual charges but no Grand Total line.
+  // Compute total from subtotal + all additive charges.
+  if (total === null && subtotal !== null && charges.length > 0) {
+    const additiveCharges = charges
+      .filter((c) => !c.gstInclusive)
+      .reduce((s, c) => s + c.amount, 0);
+    total = round2(subtotal + additiveCharges);
+    conf.total = 0.70; // inferred, lower than explicit total (0.92)
+  }
+
   // ─── Bill type context: delivery bills always have a delivery fee ─────────
   if (billType === 'delivery' && !charges.some((c) => c.type === 'delivery_fee')) {
     conf.charges = Math.min(conf.charges, 0.60);

@@ -93,6 +93,8 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\bnagar\b|\bstreet\b|\broad\b|\blane\b|\bnear\b|\bopposite\b|\bfloor\b/i,
     /\bdistrict\b|\bpincode\b|\bpin\s*code\b|\bcbe\b|\bcoimbatore\b/i,
     /\b(ph|phone|mob|mobile|tel|fax)\s*(no|num|number)?[\s:.]/i,
+    /\bpin\s*:/i,                       // "PIN: 068 78 715"
+    /^\+\d[\d\s\-()]{7,}/,             // phone numbers starting with + country code
     // Bill/receipt metadata
     /\bbill\s*no\b|\breceipt\s*no\b|\binvoice\s*no\b/i,
     /\btime\s*:/i,                      // TIME: 18:25
@@ -100,13 +102,18 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\btotal\s*item/i,                  // "TOTAL ITEM(S): 4 /QTY:16"
     /\/qty/i,                           // "/QTY:16"
     // UberEats / delivery app metadata
-    /\border\s*details?\b/i,            // "Order Details:"
+    /\border\s*(details?|note)\b/i,    // "Order Details:", "ORDER NOTE"
     /\bplaced\s*:/i,                    // "Placed: Mon May 11..."
     /\bprepare\s*by\b/i,               // "Prepare by Mon May 11..."
     /\bcustomer\s*info\b/i,            // "Customer Info"
     /\bprepaid\b/i,                    // "PREPAID - Do Not Charge"
     /\bordermark\b|\bomid\b/i,         // "Ordermark omid-0000-6480"
     /\bdo\s*not\s*charge\b/i,
+    /\binternal\s*id\b/i,              // "INTERNAL ID #3honn"
+    /\bdelivery\s*date\s*:/i,          // "Delivery date:"
+    /\breceived\s*:/i,                 // "Received: Thu Jul 29..."
+    /\breturn\s*customer\b/i,          // order notes: "Return customer (4 orders)..."
+    /\bdon'?t\s+forget\b/i,           // order notes: "don't forget the garlic aioli"
     // Order/tracking codes — short alphanumeric strings (F0006, #12345)
     /^[A-Z]?\d{3,6}$|^#\d+$/i,        // "F0006", "#190"
     // Item modifier lines — start with "- " (customization options)

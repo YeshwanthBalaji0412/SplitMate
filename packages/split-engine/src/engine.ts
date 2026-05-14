@@ -170,16 +170,38 @@ export function computeSplit(
   const chargeBreakdownMap = new Map<string, PersonBreakdown['chargeBreakdown']>();
   for (const uid of subtotals.keys()) chargeBreakdownMap.set(uid, []);
 
-  // Sort charges by position to maintain consistent application order
-  const sortedCharges = [...chargeComponents].sort((a, b) => a.position - b.position);
+  // ── Enforce discount → tax → fee ordering (SWE.md §2) ──
+  // Discount order-of-ops is enforced in code regardless of position.
+  // 1. Discounts reduce the base → taxes are computed on post-discount amounts
+  // 2. Taxes on post-discount base
+  // 3. Fees (flat or proportional)
+  // Within each phase, sort by position for deterministic ordering.
 
-  for (const charge of sortedCharges) {
-    if (charge.type === 'subtotal') continue; // subtotal is handled above
+  const TAX_TYPES: Set<string> = new Set(['sales_tax', 'state_tax', 'city_tax']);
 
-    const distribution = distributeCharge(charge, participants, subtotals);
+  const discounts: ChargeComponent[] = [];
+  const taxes: ChargeComponent[] = [];
+  const fees: ChargeComponent[] = [];
 
+  for (const charge of chargeComponents) {
+    if (charge.type === 'subtotal') continue;
+    if (charge.type === 'discount') discounts.push(charge);
+    else if (TAX_TYPES.has(charge.type)) taxes.push(charge);
+    else fees.push(charge);
+  }
+
+  const byPosition = (a: ChargeComponent, b: ChargeComponent) => a.position - b.position;
+  discounts.sort(byPosition);
+  taxes.sort(byPosition);
+  fees.sort(byPosition);
+
+  // Post-discount subtotals — taxes use these as their proportional base
+  const postDiscountSubtotals = new Map(subtotals);
+
+  // Helper to apply a charge and update running totals + breakdown
+  const applyCharge = (charge: ChargeComponent, proportionalBase: Map<string, number>) => {
+    const distribution = distributeCharge(charge, participants, proportionalBase);
     for (const [uid, amount] of distribution) {
-      // Discounts are negative
       const signed = charge.type === 'discount' ? -Math.abs(amount) : amount;
       runningTotal.set(uid, (runningTotal.get(uid) ?? 0) + signed);
       chargeBreakdownMap.get(uid)?.push({
@@ -189,6 +211,25 @@ export function computeSplit(
         amount: signed,
       });
     }
+    return distribution;
+  };
+
+  // Phase 1: Discounts — reduce the base that taxes are calculated on
+  for (const discount of discounts) {
+    const distribution = applyCharge(discount, subtotals);
+    for (const [uid, amount] of distribution) {
+      postDiscountSubtotals.set(uid, (postDiscountSubtotals.get(uid) ?? 0) - Math.abs(amount));
+    }
+  }
+
+  // Phase 2: Taxes — proportional to post-discount subtotals
+  for (const tax of taxes) {
+    applyCharge(tax, postDiscountSubtotals);
+  }
+
+  // Phase 3: Fees — proportional to post-discount subtotals
+  for (const fee of fees) {
+    applyCharge(fee, postDiscountSubtotals);
   }
 
   // Stage 4: round to precision, absorb rounding remainder into max-ower

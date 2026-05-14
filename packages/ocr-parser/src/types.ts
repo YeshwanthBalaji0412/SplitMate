@@ -58,6 +58,10 @@ export interface ParsedCharge {
   amount: number;
   rate?: number;        // e.g. 0.025 for 2.5%
   confidence: number;
+  // True when this tax is already baked into item prices (MRP-inclusive).
+  // Split engine must NOT add it on top — it's informational only.
+  // Always surfaced to user for confirmation.
+  gstInclusive?: boolean;
 }
 
 // The full output of the parser — a draft bill ready for the user to review.

@@ -79,13 +79,26 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /visit\s*again/i,
     /powered\s*by/i,
     /www\.|\.com|\.in\b/i,
-    /\b(gstin|fssai|cin)\b/i,          // registration numbers
+    /\b(gstin|fssai|cin)\b/i,          // registration numbers (full line)
+    /^[A-Z0-9]{10,}\s*\d{2}[A-Z]\b/i, // GSTIN format: 15-char alphanumeric
     /^\*+$/,                            // separator lines like ****
     /^[-=]+$/,                          // separator lines like ----
-    // Column header rows — "Item Qty Price Amount", "Description Rate Amt" etc.
+    // Column header rows
     /\b(qty|quantity)\b.{0,30}\b(price|amount|rate|amt)\b/i,
     /\bitem\b.{0,20}\b(qty|price|amount)\b/i,
     /\bdescription\b.{0,30}\b(qty|rate|amount)\b/i,
+    // Tax breakdown header rows
+    /\btax\s*%\b.{0,30}\b(cgst|sgst|taxable)\b/i,
+    // Address indicators
+    /\bnagar\b|\bstreet\b|\broad\b|\blane\b|\bnear\b|\bopposite\b|\bfloor\b/i,
+    /\bdistrict\b|\bpincode\b|\bpin\s*code\b|\bcbe\b|\bcoimbatore\b/i,
+    /\b(ph|phone|mob|mobile|tel|fax)\s*(no|num|number)?[\s:.]/i,
+    // Bill/receipt metadata
+    /\bbill\s*no\b|\breceipt\s*no\b|\binvoice\s*no\b/i,
+    /\btime\s*:/i,                      // TIME: 18:25
+    /^\s*p\s*$/i,                       // standalone "P" line (common on thermal printers)
+    /\btotal\s*item/i,                  // "TOTAL ITEM(S): 4 /QTY:16"
+    /\/qty/i,                           // "/QTY:16"
   ],
 };
 
@@ -108,12 +121,25 @@ function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some((p) => p.test(text));
 }
 
+function isPureNumericRow(text: string): boolean {
+  // A row of 3+ whitespace-separated tokens that are all numbers/percentages
+  // e.g. "5.00 771.43 19.29 19.29 38.57" — tax breakdown data row
+  const tokens = text.trim().split(/\s+/);
+  if (tokens.length < 3) return false;
+  return tokens.every((t) => /^[₹$%]?\d+([.,]\d+)?%?$/.test(t));
+}
+
 function classifyLine(line: RawLine, isFirstLine: boolean): ClassifiedLine {
   const text = line.text.trim();
 
   // Noise first — empty or separator lines
   if (matchesAny(text, PATTERNS.noise)) {
     return { raw: line, lineType: 'noise', confidence: 0.95 };
+  }
+
+  // Pure numeric rows — tax breakdown data, not items
+  if (isPureNumericRow(text)) {
+    return { raw: line, lineType: 'noise', confidence: 0.85 };
   }
 
   // Total before subtotal — "total" patterns are more specific
@@ -188,8 +214,13 @@ function mergeWrappedLines(lines: RawLine[]): RawLine[] {
     const isFirstLine = i === firstContentIdx;
 
     // Merge only if: not the first line, no price, has text, next has a price,
-    // and current line looks like a name fragment (letters present, not a separator).
-    const looksLikeName = /[a-zA-Zऀ-ॿ]/.test(current.text) && !/^[-=*]+$/.test(current.text.trim());
+    // current looks like a name fragment (has letters, not a separator or keyword line).
+    const looksLikeName = /[a-zA-Zऀ-ॿ]/.test(current.text)
+      && !/^[-=*]+$/.test(current.text.trim())
+      && !matchesAny(current.text, PATTERNS.noise)      // skip known noise lines
+      && !matchesAny(current.text, PATTERNS.tax_line)   // skip tax headers
+      && !matchesAny(current.text, PATTERNS.subtotal)
+      && !matchesAny(current.text, PATTERNS.total);
     if (!isFirstLine && !currentHasPrice && currentHasText && nextHasPrice && looksLikeName) {
       merged.push({
         text: `${current.text.trim()} ${next.text.trim()}`,

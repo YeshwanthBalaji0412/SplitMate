@@ -22,25 +22,45 @@ function detectItemCategory(name: string): ItemCategory {
 
 // ─── Quantity extraction ──────────────────────────────────────────────────────
 
-const QTY_RE = /^(\d+)\s*[x×]\s*/i;
+// Unit suffixes used on Indian receipts: Pk (pack), Pcs (pieces), Nos, Kg, Gm, L, Ml
+const UNIT_SUFFIX_RE = /^(\d+)\s*(pk|pcs?|nos?|kg|gm|g|ltr?|ml)\b/i;
+const QTY_X_RE = /^(\d+)\s*[x×]\s*/i;
 
 function extractQuantityAndName(text: string): { quantity: number; name: string } {
-  const match = text.match(QTY_RE);
-  if (match) {
+  // "9Pk PAROTTA" or "9Pk" embedded in cleaned name
+  const unitMatch = text.match(UNIT_SUFFIX_RE);
+  if (unitMatch) {
     return {
-      quantity: parseInt(match[1], 10),
-      name: text.slice(match[0].length).trim(),
+      quantity: parseInt(unitMatch[1], 10),
+      name: text.slice(unitMatch[0].length).trim() || text.trim(),
     };
   }
-  // Quantity at end: "Butter Chicken x2"
-  const trailingMatch = text.match(/^(.+?)\s*[x×]\s*(\d+)\s*$/i);
-  if (trailingMatch) {
+
+  // "2x Naan" or "2 x Naan"
+  const xPrefixMatch = text.match(QTY_X_RE);
+  if (xPrefixMatch) {
     return {
-      quantity: parseInt(trailingMatch[2], 10),
-      name: trailingMatch[1].trim(),
+      quantity: parseInt(xPrefixMatch[1], 10),
+      name: text.slice(xPrefixMatch[0].length).trim(),
     };
   }
+
+  // "Naan x2"
+  const xSuffixMatch = text.match(/^(.+?)\s*[x×]\s*(\d+)\s*$/i);
+  if (xSuffixMatch) {
+    return {
+      quantity: parseInt(xSuffixMatch[2], 10),
+      name: xSuffixMatch[1].trim(),
+    };
+  }
+
   return { quantity: 1, name: text.trim() };
+}
+
+// Strip leading SI/serial number: "1 PAROTTA", "2 CHICKEN 65"
+function stripSerialNumber(text: string): string {
+  // Match a leading digit(s) followed by a space and then a letter — serial number
+  return text.replace(/^\d+\s+(?=[A-Za-z])/, '').trim();
 }
 
 function cleanItemName(rawText: string, price: number): string {
@@ -149,7 +169,7 @@ export function extractFields(
         const price = extractPrice(text);
         if (price === null) break;
 
-        const nameRaw = cleanItemName(text, price);
+        const nameRaw = stripSerialNumber(cleanItemName(text, price));
         const { quantity, name } = extractQuantityAndName(nameRaw);
         const unitPrice = quantity > 1 ? price / quantity : price;
         const category = detectItemCategory(name);
@@ -297,8 +317,27 @@ export function extractFields(
     conf.subtotal = 0.65; // inferred, lower confidence
   }
 
+  // ─── GST-inclusive detection (India) ─────────────────────────────────────
+  // If item subtotal ≈ total, there's no room for additional tax charges.
+  // This means GST is already baked into item prices (MRP-inclusive).
+  // Mark those tax charges as gstInclusive so the split engine doesn't add them again.
+  if (country === 'IN' && subtotal !== null && total !== null) {
+    const taxChargeTotal = round2(
+      charges.filter((c) => c.type === 'sales_tax').reduce((s, c) => s + c.amount, 0)
+    );
+    const itemsAlreadyCoverTotal = Math.abs(subtotal - total) < 1.00;
+    if (itemsAlreadyCoverTotal && taxChargeTotal > 0) {
+      for (const charge of charges) {
+        if (charge.type === 'sales_tax') {
+          charge.gstInclusive = true;
+        }
+      }
+      // Lower charge confidence — user must confirm inclusive vs additive
+      conf.charges = Math.min(conf.charges, 0.65);
+    }
+  }
+
   // ─── Bill type context: delivery bills always have a delivery fee ─────────
-  // If bill_type is delivery but no delivery fee found, flag charges
   if (billType === 'delivery' && !charges.some((c) => c.type === 'delivery_fee')) {
     conf.charges = Math.min(conf.charges, 0.60);
   }
@@ -351,10 +390,18 @@ function parseDate(text: string): string | null {
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 
-  // DD/MM/YYYY or DD-MM-YYYY
+  // DD/MM/YYYY or DD-MM-YYYY (4-digit year)
   const dmyMatch = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
   if (dmyMatch) {
     const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  // DD/MM/YY — 2-digit year, normalise to 20xx
+  const dmyShortMatch = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})\b/);
+  if (dmyShortMatch) {
+    const [, d, m, yy] = dmyShortMatch;
+    const y = `20${yy}`;
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 

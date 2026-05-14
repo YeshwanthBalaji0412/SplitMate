@@ -66,3 +66,61 @@ exports[`parser snapshots — real receipts > in-delivery-01: Indian delivery re
   "total": 460,
 }
 `;
+
+exports[`parser snapshots — real receipts > in-restaurant-01: Indian restaurant receipt (GST-inclusive, SI numbers, Pk quantities) 1`] = `
+{
+  "billType": "restaurant",
+  "charges": [],
+  "confidenceScores": {
+    "charges": 0,
+    "date": 0.85,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "IN",
+  "date": "2025-09-07",
+  "flaggedFields": [
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "PAROTTA 9Pk",
+      "quantity": 1,
+      "totalPrice": 180,
+      "unitPrice": 180,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CHICKEN 65 1Pk",
+      "quantity": 1,
+      "totalPrice": 150,
+      "unitPrice": 150,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CHICKEN LOLIPOP 4Pk",
+      "quantity": 1,
+      "totalPrice": 200,
+      "unitPrice": 200,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "C.THOKKU BIRIYA 2Pk",
+      "quantity": 1,
+      "totalPrice": 280,
+      "unitPrice": 280,
+    },
+  ],
+  "merchantName": "HOTEL SATHAR ROWTHER",
+  "subtotal": 810,
+  "total": 810,
+}
+`;

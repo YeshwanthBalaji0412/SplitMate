@@ -124,3 +124,53 @@ exports[`parser snapshots — real receipts > in-restaurant-01: Indian restauran
   "total": 810,
 }
 `;
+
+exports[`parser snapshots — real receipts > us-delivery-01: UberEats receipt (US, single item with modifiers, tax additive) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 37.28,
+      "confidence": 0.93,
+      "label": "Tax",
+      "rate": undefined,
+      "type": "state_tax",
+    },
+    {
+      "amount": 0,
+      "confidence": 0.88,
+      "label": "Tip",
+      "rate": undefined,
+      "type": "gratuity",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.6,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "King's Experience",
+      "quantity": 1,
+      "totalPrice": 369,
+      "unitPrice": 369,
+    },
+  ],
+  "merchantName": "Uber Eats",
+  "subtotal": 369,
+  "total": 406.28,
+}
+`;

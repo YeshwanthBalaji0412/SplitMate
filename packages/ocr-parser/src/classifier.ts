@@ -96,9 +96,24 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     // Bill/receipt metadata
     /\bbill\s*no\b|\breceipt\s*no\b|\binvoice\s*no\b/i,
     /\btime\s*:/i,                      // TIME: 18:25
-    /^\s*p\s*$/i,                       // standalone "P" line (common on thermal printers)
+    /^\s*p\s*$/i,                       // standalone "P" line (thermal printer artifact)
     /\btotal\s*item/i,                  // "TOTAL ITEM(S): 4 /QTY:16"
     /\/qty/i,                           // "/QTY:16"
+    // UberEats / delivery app metadata
+    /\border\s*details?\b/i,            // "Order Details:"
+    /\bplaced\s*:/i,                    // "Placed: Mon May 11..."
+    /\bprepare\s*by\b/i,               // "Prepare by Mon May 11..."
+    /\bcustomer\s*info\b/i,            // "Customer Info"
+    /\bprepaid\b/i,                    // "PREPAID - Do Not Charge"
+    /\bordermark\b|\bomid\b/i,         // "Ordermark omid-0000-6480"
+    /\bdo\s*not\s*charge\b/i,
+    // Order/tracking codes — short alphanumeric strings (F0006, #12345)
+    /^[A-Z]?\d{3,6}$|^#\d+$/i,        // "F0006", "#190"
+    // Item modifier lines — start with "- " (customization options)
+    /^\s*-\s+[A-Za-z]/,               // "- Medium", "- House Special..."
+    // Delivery platform labels
+    /^delivery$/i,                      // standalone "Delivery" label (not a fee)
+    /^pickup$/i,
   ],
 };
 

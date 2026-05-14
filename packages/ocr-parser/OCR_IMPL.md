@@ -31,8 +31,9 @@ ParsedBillDraft           ← JSON draft shown to user for review
 
 | File | Type | Market | Issues Found |
 |---|---|---|---|
-| `in-delivery-01.txt` | Food delivery | India | 4 issues (all fixed) |
-| `in-restaurant-01.txt` | Restaurant | India | 6 issues (in progress) |
+| `in-delivery-01.txt` | Food delivery | India | 5 issues (all fixed) |
+| `in-restaurant-01.txt` | Restaurant | India | 6 issues (5 fixed, 1 known limitation) |
+| `us-delivery-01.txt` | Food delivery (UberEats) | USA | 6 issues (all fixed) |
 
 ---
 
@@ -153,6 +154,59 @@ Called before `extractQuantityAndName` in the item extraction flow.
 **Symptom:** GST ₹38.57 is already baked into ₹810 total — if treated as additive charge, split engine would inflate totals
 **Root cause:** Indian bills show GST as an informational breakdown of included tax, not as an additional charge
 **Fix:** Added `gstInclusive?: boolean` to `ParsedCharge` type. In `extractFields`, after subtotal inference: if `Math.abs(itemSubtotal - total) < 1.00`, all `sales_tax` charges are marked `gstInclusive: true` and charge confidence is capped at 0.65 to force user review.
+
+---
+
+---
+
+### FIXED — Issue 13: Order codes (F0006) parsed as items
+**Receipt:** us-delivery-01.txt
+**Symptom:** `"F0006"` → item with price `6` (trailing digit extracted as price)
+**Root cause:** Short alphanumeric order codes end in digits — price regex matches the trailing number
+**Fix:** Added `/^[A-Z]?\d{3,6}$|^#\d+$/i` to `PATTERNS.noise` — catches order codes like `F0006`, `#190`
+
+---
+
+### FIXED — Issue 14: "Order Details:" merged with item line
+**Receipt:** us-delivery-01.txt
+**Symptom:** `"Order Details: 1X King's Experience $369.00"` appeared as merged item name
+**Root cause:** `"Order Details:"` (no price) + `"1X King's Experience $369.00"` (has price) — merged by `mergeWrappedLines`
+**Fix:** Added `/\border\s*details?\b/i` to `PATTERNS.noise`. Since noise is excluded from merge candidates, the merge no longer fires.
+
+---
+
+### FIXED — Issue 15: "PREPAID - Do Not Charge" + Ordermark merged as item
+**Receipt:** us-delivery-01.txt
+**Symptom:** Both lines merged, `"6480"` extracted as price `6480`
+**Root cause:** `PREPAID` line had letters (passed `looksLikeName`) and no price; Ordermark line ended in `6480`
+**Fix:** Added `/\bprepaid\b/i`, `/\bordermark\b|\bomid\b/i`, `/\bdo\s*not\s*charge\b/i` to noise patterns
+
+---
+
+### FIXED — Issue 16: "Tax: $37.28" label not clean, wrong type
+**Receipt:** us-delivery-01.txt
+**Symptom:** `label: "Tax:"`, `type: "custom"` instead of `label: "Tax"`, `type: "state_tax"`
+**Root cause:** `buildChargeType` pattern matched full line including price; `cleanChargeLabel` didn't strip trailing colon
+**Fix:**
+- Added `/^tax[\s:$₹\d.,]*$/` pattern to `buildChargeType` — matches "Tax:", "Tax $37.28" → `state_tax` for US
+- Updated `cleanChargeLabel` to strip trailing colons: `.replace(/[-:]\s*$/, '')`
+
+---
+
+### FIXED — Issue 17: "$369.00" left in item name
+**Receipt:** us-delivery-01.txt
+**Symptom:** `name: "King's Experience $369.00"` — price with `$` prefix not stripped
+**Root cause:** `cleanItemName` used `price.toString()` (`"369"`) to build strip regex, but text had `"$369.00"` — integer vs decimal mismatch
+**Fix:** Updated `cleanItemName` regex to match optional decimal suffix `(?:\.\d{1,2})?` and added a second pass for `[₹$]` prefixed prices
+
+---
+
+### ACCEPTED LIMITATION — Issue 18: Date missing year (UberEats format)
+**Receipt:** us-delivery-01.txt
+**Symptom:** `date: null` — `"Mon May 11 at 4:05 PM"` has no year
+**Root cause:** UberEats prints relative date with day-of-week and time but no year
+**Behaviour:** `date` flagged for user input. Correct — we cannot infer the year reliably.
+**Future:** Could infer year from current date if date is within ±7 days. Not worth the complexity for v1.
 
 ---
 

@@ -318,7 +318,10 @@ export function extractFields(
   // ─── Infer subtotal if missing ────────────────────────────────────────────
   if (subtotal === null && items.length > 0) {
     subtotal = round2(items.reduce((s, i) => s + i.totalPrice, 0));
-    conf.subtotal = 0.65; // inferred, lower confidence
+    // If all items are negative (partial receipt showing only discounts),
+    // the inferred subtotal is meaningless — flag it strongly.
+    const allNegative = items.every((i) => i.totalPrice <= 0);
+    conf.subtotal = allNegative ? 0.20 : 0.65;
   }
 
   // ─── GST-inclusive detection (India) ─────────────────────────────────────
@@ -389,10 +392,10 @@ function average(nums: number[]): number {
 }
 
 function cleanChargeLabel(text: string, _amount: number): string {
-  // Remove trailing price (any format: 30, 30.00, ₹30, $30.00)
   return text
-    .replace(/\s*[₹$]?\s*\d{1,6}(?:[.,]\d{1,2})?\s*$/, '')
-    .replace(/[-:]\s*$/, '')   // strip trailing colon or dash
+    .replace(/\s*\*+\s*$/, '')                            // strip trailing * (grocery discount marker)
+    .replace(/-?\s*[₹$]?\s*\d{1,6}(?:[.,]\d{1,2})?\s*$/, '') // strip trailing price (incl. negative)
+    .replace(/[-:]\s*$/, '')                              // strip trailing colon or dash
     .trim();
 }
 

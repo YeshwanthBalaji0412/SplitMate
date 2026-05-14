@@ -222,3 +222,49 @@ exports[`parser snapshots — real receipts > us-delivery-02: UberEats receipt (
   "total": 30.47,
 }
 `;
+
+exports[`parser snapshots — real receipts > us-grocery-01: US grocery receipt (discounts, negative prices, payment lines, savings summary) 1`] = `
+{
+  "billType": "grocery",
+  "charges": [
+    {
+      "amount": -0.77,
+      "confidence": 0.82,
+      "label": "WH/SDL GR GRAPES SCP",
+      "type": "discount",
+    },
+    {
+      "amount": -2,
+      "confidence": 0.88,
+      "label": "$2 OFF $5 MEAT",
+      "type": "discount",
+    },
+    {
+      "amount": -2.29,
+      "confidence": 0.82,
+      "label": "NP BBY PLD CRT SCP",
+      "type": "discount",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.84,
+    "date": 0,
+    "items": 0,
+    "merchantName": 0,
+    "subtotal": 0,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "merchantName",
+    "date",
+    "items",
+    "subtotal",
+  ],
+  "items": [],
+  "merchantName": null,
+  "subtotal": null,
+  "total": 20.41,
+}
+`;

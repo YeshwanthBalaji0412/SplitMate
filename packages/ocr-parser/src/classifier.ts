@@ -59,9 +59,11 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     /\bsub\s*total\b/i,
     /\bitem\s*total\b/i,
     /\bnet\s*amount\b/i,
+    /\btotal\s*before\s*(savings?|discount)\b/i, // "Total before savings" = pre-discount subtotal
   ],
   total: [
     /\bgrand\s*total\b/i,
+    /\btotal\s*after\s*(savings?|discount)\b/i, // "Total after savings" — takes priority over plain Total
     /\btotal\s*(amount|due|payable)?\b/i,
     /\bamount\s*(due|payable)\b/i,
     /\bbill\s*total\b/i,
@@ -121,20 +123,33 @@ const PATTERNS: Record<LineType, RegExp[]> = {
     // Delivery platform labels
     /^delivery$/i,                      // standalone "Delivery" label (not a fee)
     /^pickup$/i,
+    // Section headers — "END EASYSHOP ORDER", "YOUR SAVINGS SUMMARY"
+    /^(end|your|our)\s+\w.{3,}\s+(order|summary|section)\s*$/i,
+    // Payment method lines — EGift, Cash, Credit, Debit, Change, Tender
+    /^(egift|e-gift|gift\s*card|cash|credit|debit|visa|mastercard|amex|change|tender|paid)\b/i,
+    // Savings / loyalty summary lines
+    /\b(year.to.date|ytd)\s*(savings?|total)/i,  // "YEAR-TO-DATE SAVINGS"
+    /\bcard\s*savings?\b/i,                       // "Stop & Shop Card Savings"
+    /\bpersonal\s*thanks?\b/i,                    // "PERSONAL THANKS SAVINGS"
+    /\btotal\s*(stop|card|loyalty|reward|club)\b/i,
+    /\byour\s*total\s*savings?\b/i,               // "Your Total Savings $24.04" (not a charge)
+    /\* \*/,                                       // "* * * * * *" separator variant
   ],
 };
 
 // ─── Price extraction helper ──────────────────────────────────────────────────
 
-const PRICE_RE = /[₹$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d{1,6}(?:\.\d{1,2})?)\s*$/;
+// Matches optional negative sign, optional currency symbol, then the number.
+// Allows trailing * (grocery discount marker) and trailing whitespace.
+const PRICE_RE = /(-?)\s*[₹$]?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d{1,6}(?:\.\d{1,2})?)[\s*]*$/;
 
 export function extractPrice(text: string): number | null {
   const match = text.match(PRICE_RE);
   if (!match) return null;
-  // Remove thousands-separator commas, keep decimal point
-  const cleaned = match[1].replace(/,(?=\d{3})/g, '');
+  const sign = match[1] === '-' ? -1 : 1;
+  const cleaned = match[2].replace(/,(?=\d{3})/g, '');
   const val = parseFloat(cleaned);
-  return isNaN(val) ? null : val;
+  return isNaN(val) ? null : sign * val;
 }
 
 // ─── Core classifier ─────────────────────────────────────────────────────────
@@ -189,6 +204,15 @@ function classifyLine(line: RawLine, isFirstLine: boolean): ClassifiedLine {
 
   if (matchesAny(text, PATTERNS.discount)) {
     return { raw: line, lineType: 'discount', confidence: 0.88 };
+  }
+
+  // Negative price = discount even without discount keywords
+  // e.g. "WH/SDL GR GRAPES SCP -0.77 *" on grocery receipts
+  // Guard: don't fire on date lines (YYYY-MM-DD ends in negative-looking number)
+  const price = extractPrice(text);
+  const looksLikeDate = matchesAny(text, PATTERNS.date);
+  if (price !== null && price < 0 && !looksLikeDate) {
+    return { raw: line, lineType: 'discount', confidence: 0.82 };
   }
 
   if (matchesAny(text, PATTERNS.date)) {

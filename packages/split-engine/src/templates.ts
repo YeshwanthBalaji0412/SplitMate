@@ -52,7 +52,7 @@ export function applyChargeDefaults(
   charges: ChargeComponent[],
   template: BillRuleTemplate
 ): ChargeComponent[] {
-  const rules = template.rules as TemplateRules;
+  const rules = template.rules as unknown as TemplateRules;
   if (!rules.chargeDefaults || rules.chargeDefaults.length === 0) return charges;
 
   const defaultMap = new Map(
@@ -78,7 +78,7 @@ export function applyChargeDefaults(
 export function buildSplitOverrides(
   template: BillRuleTemplate
 ): Record<string, number> {
-  const rules = template.rules as TemplateRules;
+  const rules = template.rules as unknown as TemplateRules;
   return rules.memberAllocations ?? {};
 }
 
@@ -87,7 +87,7 @@ export function buildSplitOverrides(
  * Returns null if valid, or an error message if not.
  */
 export function validateTemplate(template: BillRuleTemplate): string | null {
-  const rules = template.rules as TemplateRules;
+  const rules = template.rules as unknown as TemplateRules;
 
   if (rules.splitMethod === 'percentage' && rules.memberAllocations) {
     const total = Object.values(rules.memberAllocations).reduce((s, v) => s + v, 0);

@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, Stack } from 'expo-router';
+import { useLocalSearchParams, Stack, router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { computeSplit, formatAmount } from '@split-smart/split-engine';
 import type {
@@ -24,7 +24,7 @@ interface ProfileMap {
 }
 
 export default function BillDetailScreen() {
-  const { billId } = useLocalSearchParams<{ billId: string }>();
+  const { id: groupId, billId } = useLocalSearchParams<{ id: string; billId: string }>();
   const [expense, setExpense] = useState<Expense | null>(null);
   const [breakdown, setBreakdown] = useState<PersonBreakdown[]>([]);
   const [profiles, setProfiles] = useState<ProfileMap>({});
@@ -163,6 +163,14 @@ export default function BillDetailScreen() {
         </Text>
       </View>
 
+      {/* Reassign items button */}
+      <TouchableOpacity
+        style={styles.assignBtn}
+        onPress={() => router.push(`/(app)/groups/${groupId}/assign-items?expenseId=${billId}`)}
+      >
+        <Text style={styles.assignBtnText}>Reassign Items</Text>
+      </TouchableOpacity>
+
       {/* Per-person breakdown — the core explainability view */}
       <Text style={styles.sectionTitle}>Who owes what</Text>
 
@@ -230,6 +238,8 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
   summaryTotal: { fontSize: 32, fontWeight: '800', color: '#16a34a', marginTop: 6 },
   summaryMeta: { fontSize: 13, color: '#9ca3af', marginTop: 6 },
+  assignBtn: { backgroundColor: '#f3f4f6', borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginBottom: 16 },
+  assignBtnText: { color: '#374151', fontWeight: '600', fontSize: 14 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginBottom: 12 },
   personCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6 },
   personHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

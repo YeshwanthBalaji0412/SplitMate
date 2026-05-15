@@ -11,22 +11,52 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 
-export default function LoginScreen() {
+export default function SignupScreen() {
+  const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  async function handleLogin() {
+  async function handleSignup() {
+    if (!displayName.trim()) { setError('Display name is required'); return; }
+    if (!email.trim()) { setError('Email is required'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+
     setError(null);
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: displayName.trim() },
+      },
+    });
+
     if (error) {
       setError(error.message);
     } else {
-      router.replace('/(app)/dashboard');
+      setSuccess(true);
     }
     setLoading(false);
+  }
+
+  if (success) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.card}>
+          <Text style={styles.title}>Check your email</Text>
+          <Text style={styles.subtitle}>
+            We sent a confirmation link to {email}. Tap it to activate your account.
+          </Text>
+          <TouchableOpacity style={styles.button} onPress={() => router.replace('/(auth)/login')}>
+            <Text style={styles.buttonText}>Back to sign in</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -35,9 +65,16 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Welcome back</Text>
-        <Text style={styles.subtitle}>Sign in to SplitMate</Text>
+        <Text style={styles.title}>Create account</Text>
+        <Text style={styles.subtitle}>Join SplitMate</Text>
 
+        <TextInput
+          style={styles.input}
+          placeholder="Display name"
+          autoCapitalize="words"
+          value={displayName}
+          onChangeText={setDisplayName}
+        />
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -48,7 +85,7 @@ export default function LoginScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="Password"
+          placeholder="Password (min 6 characters)"
           secureTextEntry
           value={password}
           onChangeText={setPassword}
@@ -56,12 +93,12 @@ export default function LoginScreen() {
 
         {error && <Text style={styles.error}>{error}</Text>}
 
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-          <Text style={styles.buttonText}>{loading ? 'Signing in…' : 'Sign in'}</Text>
+        <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
+          <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create account'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-          <Text style={styles.link}>No account? Sign up</Text>
+        <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
+          <Text style={styles.link}>Already have an account? Sign in</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

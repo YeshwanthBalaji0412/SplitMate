@@ -141,17 +141,27 @@ export default function BillEntryScreen() {
       await supabase.from('charge_components').insert(chargeRows);
     }
 
-    // Auto-add creator as participant
-    await supabase.from('expense_participants').insert({
+    // Add all group members as participants
+    const { data: groupMembers } = await supabase
+      .from('group_members')
+      .select('user_id')
+      .eq('group_id', groupId);
+
+    const participantRows = (groupMembers ?? []).map((gm: any) => ({
       expense_id: expense.id,
-      user_id: user.id,
+      user_id: gm.user_id,
       owed_amount: 0,
-      paid_amount: total,
+      paid_amount: gm.user_id === user.id ? total : 0,
       is_included: true,
-    });
+    }));
+
+    if (participantRows.length > 0) {
+      await supabase.from('expense_participants').insert(participantRows);
+    }
 
     setLoading(false);
-    router.replace(`/(app)/groups/${groupId}/bill/${expense.id}`);
+    // Go to item assignment screen so users can claim items
+    router.replace(`/(app)/groups/${groupId}/assign-items?expenseId=${expense.id}`);
   }
 
   const sym = currency === 'INR' ? '₹' : '$';

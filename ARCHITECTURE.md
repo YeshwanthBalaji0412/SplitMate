@@ -195,8 +195,8 @@ Debt graph simplification using a min-flow algorithm:
 ## Key Architectural Tradeoffs
 
 ### Local-first vs cloud-first
-**Chose:** Local-first (SQLite) with optional Supabase sync.
-**Why:** Privacy, offline use, zero-friction onboarding (no account required). The cost is that real-time group sync requires Supabase to be enabled.
+**Chose:** Local-first (SQLite). No Supabase sync in MVP or V1.
+**Why:** Privacy, offline use, zero-friction onboarding (no account required). Bill data never leaves the device unless the user explicitly exports it. Supabase introduced in V2 or later — only for server-side aggregate analytics telemetry (retention signals, spend trends across users) where individual bill data is not sent. Group sync via Supabase is a future option but not a target until cloud analytics are needed.
 
 ### Rule-based split engine vs ML
 **Chose:** Fully deterministic rule engine for all split math.

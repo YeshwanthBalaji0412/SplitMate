@@ -192,13 +192,13 @@ No hard dates — this is a two-person team with day jobs. Milestones not sprint
 
 ## Open Decisions (pre-MVP)
 
-- [ ] Local-first storage: SQLite (local) + optional Supabase sync — architecture decision needed before any data work
-- [ ] Minimum Ollama model for MVP OCR quality: evaluate phi-3-vision vs llava vs moondream on receipt images
-- [ ] Settlement traceability: requires `settlement_expense_links` junction table — flag to SWE before schema is finalized
-- [ ] `country` field on groups: missing from current schema — blocker for tax rule engine
+- [x] Local-first storage: **SQLite local-first, no Supabase sync for MVP.** Supabase brought in later (V1/V2) only when we need server-side user analytics telemetry (aggregate spend patterns, retention signals). Bill data stays on-device. Rationale: privacy, zero-friction onboarding, no account required to use the app. See ARCHITECTURE.md.
+- [x] OCR approach: Google ML Kit on-device — decided, rationale in ARCHITECTURE.md
+- [x] Settlement traceability: `settlement_expense_links` junction table added in migration 002 (SWE)
+- [x] `country` field on groups: added in migration 002, unblocks tax rule engine and ML Kit parsing mode
 
 ---
 
 *Owned by: Sruthi (MLE) + SWE Lead*
-*Last updated: 2026-05-11*
+*Last updated: 2026-05-18*
 *Cross-reference: [ARCHITECTURE.md](ARCHITECTURE.md) · [MLE.md](MLE.md) · [SWE.md](SWE.md)*

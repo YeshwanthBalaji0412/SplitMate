@@ -17,9 +17,9 @@
 | Spending personality | `analytics` | `layer2-intelligence` → main | **Complete** | covered via aggregator |
 | Storage manager | `analytics` | `layer2-intelligence` → main | **Complete** | 11 |
 | Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
-| ML Kit integration | `mobile` | `mlkit-integration` | **In progress** | — |
-| **Confidence correction UX** | `mobile` | next branch | **Up next** | — |
-| SQLite query layer | `mobile` | after correction UX | Not started | — |
+| ML Kit integration | `mobile` | `mlkit-integration` → main | **Complete** | — |
+| Confidence correction UX | `mobile` | `ocr-correction-ux` | **In progress** | — |
+| **SQLite query layer** | `mobile` | next branch | **Up next** | — |
 
 ---
 
@@ -79,17 +79,21 @@ Longitudinal intelligence layer. Takes `BillRecord[]` from the caller, returns p
 
 ---
 
-### Module 5 — Confidence Correction UX
-**Branch:** off `main` after Module 4 merges
-**Depends on:** ML Kit integration complete, bill entry screen from SWE
+### Module 5 — Confidence Correction UX ✓ in progress
+**Branch:** `ocr-correction-ux`
+**Depends on:** ML Kit integration (✓ merged to main)
 
-Surface low-confidence fields to the user for review:
-- `flagged_fields` from parser → highlighted in bill entry form (yellow border, "tap to confirm")
-- High-confidence fields pre-filled, no highlight — user ignores them unless wrong
-- User corrects → field confidence overridden to 1.0, removed from `flagged_fields`
-- "All fields confirmed" → bill draft is promoted to `active`
+**Built:**
 
-**Deliverable:** User sees exactly what the parser was uncertain about and nothing else. One tap per flagged field to confirm or correct.
+`useFlaggedFields(initialFlagged)` — tracks which fields still need user review. `isFlagged(field)` drives visual treatment. `confirm(field)` removes the flag when the user edits. `reset(fields)` re-seeds from a new scan.
+
+`bill-entry.tsx` updates:
+- `date` field added — was hardcoded to today, now editable and can be flagged by the parser
+- Yellow amber border (`#f59e0b`) + "Review" chip on any flagged input or section
+- Items and charges sections get a full amber outline when their section is flagged — editing any value auto-confirms
+- Total row turns amber with a note ("Parser was uncertain — verify items & charges") when `total` is flagged; tapping the amount confirms it
+- Scan badge counts down live: "3 fields need review" → "1 field needs review" → "✓ All fields confirmed" (green)
+- All visual treatment disappears on a manual-entry bill (no scan → no flags)
 
 ---
 
@@ -180,4 +184,5 @@ The `analytics` package takes `BillRecord[]` — someone has to fetch those from
 | 2026-05-14 | Analytics | Aggregator and personality complete — 32 tests |
 | 2026-05-18 | Analytics | Storage manager and exporter complete — 21 tests, all modules done |
 | 2026-05-18 | — | All MLE branches merged to main. ML Kit integration is next. |
-| 2026-05-18 | ML Kit integration | `useOcrScanner` + `useReceiptAsset` + bill-entry pre-fill complete. On `mlkit-integration` branch. |
+| 2026-05-18 | ML Kit integration | `useOcrScanner` + `useReceiptAsset` + bill-entry pre-fill complete. Merged to main. |
+| 2026-05-18 | Confidence correction UX | `useFlaggedFields` + amber highlight treatment + date field + live badge countdown. On `ocr-correction-ux` branch. |

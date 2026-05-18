@@ -6,67 +6,108 @@
 
 ---
 
-## Where to Start — MVP Priorities
+## Status Overview
 
-Work in this order. Nothing in V1 or V2 is worth touching until these are solid.
+| Module | Package | Branch | Status | Tests |
+|---|---|---|---|---|
+| Item classifier | `ocr-parser` | `data_schema` → main | **Complete** | 57 |
+| Field extractor | `ocr-parser` | `data_schema` → main | **Complete** | 40 |
+| Receipt parser | `ocr-parser` | `data_schema` → main | **Complete** | 7 real receipts (snapshot) |
+| Analytics aggregator | `analytics` | `layer2-intelligence` → main | **Complete** | 32 |
+| Spending personality | `analytics` | `layer2-intelligence` → main | **Complete** | covered via aggregator |
+| Storage manager | `analytics` | `layer2-intelligence` → main | **Complete** | 11 |
+| Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
+| **ML Kit integration** | `mobile` | next branch | **Up next** | — |
+| Confidence correction UX | `mobile` | after ML Kit | Not started | — |
+| SQLite query layer | `mobile` | after correction UX | Not started | — |
 
-### 1. OCR Pipeline — Photo → Bill JSON Draft
-**Branch:** `data_schema` (off `dev`)
+---
 
-The entire MLE value proposition starts here. Goal: take a photo or screenshot of a receipt and produce a confidence-scored bill JSON draft that maps to the agreed schema.
+## What's Done
 
-**OCR approach: Google ML Kit (on-device)**
-- Runs fully on Android and iOS natively — no network call, no image ever leaves the device
-- Adds ~15MB to app size — acceptable for our lite, privacy-first audience
-- Ollama ruled out: cannot run on mobile (desktop/server runtime only)
-- Cloud LLM vision APIs ruled out: providers retain receipt images up to 30 days — violates privacy-first principle
-- ML Kit extracts raw text lines; our parsing logic converts that into structured bill JSON — intelligence lives in code, not a model
+### OCR Parser — `packages/ocr-parser`
 
-Steps:
-- Integrate ML Kit text recognition in React Native via `@react-native-ml-kit/text-recognition`
-- Build country-aware post-processing: India (CGST/SGST detection, ₹ symbol, GST-inclusive MRP flag) vs US (pre-tax item prices, additive sales tax)
-- Output schema: bill JSON with `confidence_scores` per field and `flagged_fields` array
-- Confidence threshold: fields below threshold go into `flagged_fields` — surfaced to user for correction. High-confidence fields pre-filled silently.
-- A parse failure outputs an empty draft with all fields flagged — never a crash, always manual entry fallback
+Three-stage pipeline: classify → extract → parse. Runs entirely in TypeScript, takes raw ML Kit text lines as input.
 
-**Blocker to resolve first:** SWE needs to add `parse_metadata JSONB` column to `receipt_assets` table — this is where confidence scores land. Flag this before writing pipeline output code.
-
-### 2. Item Classifier — Line Type Detection
-**Depends on:** OCR pipeline producing raw line text
-
-For each line on a parsed receipt, classify it as:
+**Classifier** — labels each receipt line as one of:
 `item | tax_line | fee_line | discount | tip | total | noise`
-
 Then for items: `food | alcohol | non_taxable | other`
+Country-aware: detects CGST/SGST pairs (India), state sales tax (US), ₹ vs $ symbol ambiguity.
 
-This classification drives which allocation rule applies. An alcohol line goes to alcohol claimants only. A tax line feeds the fee rule engine with the correct applicability scope.
+**Extractor** — pulls structured fields from classified lines:
+merchant name, date, subtotal, tax lines, fee lines, tip, total, line items with quantities and unit prices.
+India mode: aggregates CGST + SGST into a single GST line, flags MRP-inclusive prices.
+US mode: pre-tax item prices, additive tax at bottom.
 
-### 3. Country-Aware Field Extraction
-**Depends on:** Item classifier
+**Parser** — assembles extractor output into bill JSON draft with per-field confidence scores and a `flagged_fields` array.
+Low-confidence fields go in `flagged_fields` — surfaced to user for correction. High-confidence fields pre-filled silently.
+Parse failure produces an empty draft with all fields flagged — never a crash, always falls back to manual entry.
 
-- India: detect CGST + SGST as a pair → aggregate as single GST line. Flag MRP-inclusive prices. Detect service charge vs tip.
-- US: detect state sales tax line. Detect tip line. Item prices are pre-tax — no adjustment needed.
-- Both: extract merchant name, date, total, subtotal, individual line items with quantities and unit prices.
-
-### 4. Spending Personality Algorithm (V1 — build data pipeline now)
-Even though Spending Personality ships in V1, the data it needs comes from MVP bills. Design the aggregation queries now so V1 is just a read on top of existing data — not a backfill.
-
-Metrics to track per user per group from day one:
-- Ratio of actual share paid vs computed fair share (fairness delta)
-- Category breakdown of claimed items
-- Days-to-settle per expense
+**Real receipt coverage:** 7 fixture files — 2 Indian (delivery, restaurant), 5 US (2 delivery, 3 grocery). Snapshot-tested.
 
 ---
 
+### Analytics Layer 2 — `packages/analytics`
+
+Longitudinal intelligence layer. Takes `BillRecord[]` from the caller, returns plain objects. No database calls inside the package — fully unit-testable.
+
+**Aggregator** — `computeMonthlyReport`: category breakdown, per-group summary, fairness delta, avg days to settle, settlement streak. Calls personality.
+
+**Spending personality** — `derivePersonality`: 4 types (Splurger, Even-Steven, Optimizer, Settler). Requires 5+ bills lifetime. Deterministic — same bills always produce same result.
+
+**Storage manager** — `estimateStorage`, `getArchivableBills`: identifies bills eligible for archiving (settled 3+ months ago). Shown to user before they delete.
+
+**Report exporter** — `exportToJSON`, `exportToCSV`, `importFromJSON`: RFC 4180 CSV, round-trip JSON. Caller writes to device filesystem.
+
 ---
 
-## Responsibilities
+## What's Next — One Module at a Time
 
-- Receipt parsing pipeline (OCR → structured bill JSON)
-- Item and fee classification models
-- Confidence scoring and uncertainty surfacing for human-in-the-loop correction
-- Country-aware field detection (₹ vs $, GST line vs sales tax line)
-- Layer 2 intelligence: spending trends, fairness tracking, anomaly detection, spending personality
+### Module 4 — ML Kit Integration
+**Branch:** `mlkit-integration` (off `main`)
+**Depends on:** `country` field on groups (✓ in schema), `receipt_assets.parse_metadata` (✓ in schema)
+
+Wire the `ocr-parser` package into the React Native bill entry flow:
+
+1. User taps "Scan receipt" → picks photo or screenshot from camera roll
+2. Pass image to `@react-native-ml-kit/text-recognition` → raw `TextLine[]`
+3. Pass `TextLine[]` + group `country` into `ocr-parser` pipeline → `ParsedBill` with confidence scores
+4. Write `parseStatus` and `parse_metadata` (confidence scores, flagged fields) to `receipt_assets` via Supabase
+5. Return bill JSON draft to bill entry form — pre-filled fields visible immediately
+
+**Deliverable:** A receipt photo produces a pre-filled bill entry form. No UI for correction yet — that's Module 5.
+
+**What to coordinate with SWE:**
+- Bill entry screen needs to accept a `ParsedBill` draft as optional initial state
+- `receipt_assets` insert happens before parsing (status = `processing`), update after (status = `done` or `failed`)
+
+---
+
+### Module 5 — Confidence Correction UX
+**Branch:** off `main` after Module 4 merges
+**Depends on:** ML Kit integration complete, bill entry screen from SWE
+
+Surface low-confidence fields to the user for review:
+- `flagged_fields` from parser → highlighted in bill entry form (yellow border, "tap to confirm")
+- High-confidence fields pre-filled, no highlight — user ignores them unless wrong
+- User corrects → field confidence overridden to 1.0, removed from `flagged_fields`
+- "All fields confirmed" → bill draft is promoted to `active`
+
+**Deliverable:** User sees exactly what the parser was uncertain about and nothing else. One tap per flagged field to confirm or correct.
+
+---
+
+### Module 6 — SQLite Query Layer
+**Branch:** off `main` after Module 5 merges
+**Depends on:** Supabase sync wired by SWE, analytics package complete (✓)
+
+The `analytics` package takes `BillRecord[]` — someone has to fetch those from the local database. This module is the bridge:
+
+- Query layer: `getBillsForUser(userId, window)` → `BillRecord[]` from SQLite
+- Maps Supabase/SQLite rows to the `BillRecord` shape the analytics package expects
+- Called by the monthly report screen: fetch → pass to `computeMonthlyReport` → render
+
+**Deliverable:** Monthly report screen shows real data from the user's local bill history.
 
 ---
 
@@ -74,73 +115,72 @@ Metrics to track per user per group from day one:
 
 ### 2026-05-11 — ML Kit on-device, not Ollama or cloud LLM
 
-**Decision:** OCR pipeline uses Google ML Kit running fully on-device. Ollama and cloud LLM vision APIs are ruled out.
+**Decision:** OCR uses Google ML Kit running fully on-device.
 
-**Why Ollama is out:** Ollama is a desktop/server runtime — it cannot be bundled into a React Native Android or iOS app. Our product is mobile-first.
+**Ollama ruled out:** Desktop/server runtime — cannot run on Android or iOS.
 
-**Why cloud LLM APIs are out:** Receipt images are sensitive financial data — card digits, merchant locations, purchase patterns. Cloud providers (OpenAI etc.) retain API inputs for up to 30 days by default. We cannot pipe user receipt photos to a third party without violating their reasonable privacy expectations. This is a firm product decision, not a cost decision.
+**Cloud LLM APIs ruled out:** Providers retain API inputs up to 30 days. Receipt images are sensitive financial data (card digits, merchant locations, purchase patterns). Firm product decision, not a cost decision.
 
-**Why ML Kit:** On-device, ~15MB, works natively on Android and iOS, zero network calls, no data retention risk. The raw text it extracts feeds our parsing and classification logic — the intelligence is in our code, not in the model.
-
-**Future:** Ollama remains relevant as an optional server-side enhanced parsing mode for a future desktop companion or self-hosted option. Not MVP.
+**ML Kit:** On-device, ~15MB, Android + iOS native, zero network calls. Raw text feeds our parsing logic — intelligence lives in code, not a model.
 
 ---
 
-### 2026-05-10 — OCR is a draft, not a source of truth
+### 2026-05-10 — OCR output is a draft, not a source of truth
 
-**Decision:** OCR output is always treated as a draft. Every parsed field carries a confidence score. Only low-confidence fields are surfaced to the user for correction — high-confidence fields are pre-filled silently.
+**Decision:** Every parsed field carries a confidence score. Only low-confidence fields are surfaced for correction. High-confidence fields pre-filled silently.
 
-**Why:** Forcing users to review every field creates friction and defeats the purpose of OCR. Forcing zero review creates trust issues when the app gets something wrong. Confidence-gated correction is the right middle ground — the app earns trust over time by being right quietly and asking only when uncertain.
-
-**Implication:** The OCR pipeline must output confidence per field, not just values. The UI contract with SWE requires a confidence threshold parameter to determine what gets flagged.
+**Why:** Reviewing every field is friction. Zero review creates trust issues. Confidence-gated correction earns trust — the app is right quietly and asks only when uncertain.
 
 ---
 
-### 2026-05-10 — Country-aware parsing from the start
+### 2026-05-10 — Country-aware parsing from day one
 
-**Decision:** OCR pipeline handles India and USA bill formats as distinct modes, selected at group-creation time.
+**Decision:** India and USA handled as distinct parsing modes, selected by group `country` field.
 
-**Why:** Indian bills show GST breakdowns inline (CGST + SGST), prices are often GST-inclusive, and the ₹ symbol has OCR ambiguity. US bills show pre-tax item prices and add tax at the bottom. Treating these as one generic format produces incorrect field mappings. Country mode must be set before parsing begins.
-
-**Implication:** Two parsing configurations — one per market. Shared base pipeline, country-specific post-processing and field extraction logic.
+**Why:** Indian bills show CGST/SGST inline, prices often GST-inclusive, ₹ has OCR ambiguity. US bills show pre-tax items, tax at bottom. One generic format produces wrong field mappings.
 
 ---
 
-### 2026-05-10 — Input modalities all funnel to the same schema
+### 2026-05-10 — All input modalities funnel to the same schema
 
-**Decision:** Photo, screenshot, PDF, and manual entry all produce the same bill JSON schema. OCR and manual are different entry paths to the same data model — not different data models.
+**Decision:** Photo, screenshot, PDF, and manual entry all produce the same bill JSON schema.
 
-**Why:** Downstream systems (split engine, explainability view, settlement) should never need to know how a bill was entered. Coupling them to input modality would create parallel code paths and inconsistency.
+**Why:** Split engine, explainability view, and settlement must never care how a bill was entered. Coupling them to input modality creates parallel code paths.
 
 ---
 
-## Longitudinal Intelligence — Design Notes
+### 2026-05-18 — Analytics package is DB-agnostic by design
 
-### Fairness tracking
-Track per-user, per-group over time: are they consistently paying more or less than their computed fair share? Surface this as a fairness score (internal metric, optionally shareable). Flag persistent imbalance.
+**Decision:** `packages/analytics` takes plain arrays, returns plain objects. Zero database calls inside the package.
 
-### Spending personality
-Derived from category breakdown and payment behavior over minimum 5 bills. Labels: Splurger / Even-Steven / The Optimizer / The Settler. Shown as a subtle profile tag, never pushed aggressively.
+**Why:** Keeps every function unit-testable with hardcoded data. Decouples analytics from whatever DB shape SWE uses. The query layer (Module 6) is a thin adapter — if the DB schema changes, only the adapter changes, not the analytics logic.
 
-### Anomaly detection
-Flag when a bill has unusually high fees relative to order value (e.g. delivery fee > 40% of subtotal). Educates users on where their money goes without being preachy.
+---
 
-### Settlement behavior
-Track days-to-settle per group and per person. Surfaces as a group trust signal. Used in the settlement streak gamification mechanic.
+### 2026-05-18 — Supabase sync from day one, SQLite as primary
+
+**Decision:** SQLite is the primary local store. Supabase syncs group bills, membership, and settlements so all members stay in sync. Receipt images never leave the device.
+
+**Why:** Group sync is a core requirement — members need to see each other's bills. Local-first means offline works and split math never hits the network. These are not in conflict.
+
+**V2 addition:** Aggregate user analytics telemetry (spend trends, retention signals across users) added on top of the same Supabase instance when needed. Individual bill data is not involved.
 
 ---
 
 ## Open Questions
 
-- [ ] PaddleOCR vs Tesseract: evaluate on real Indian and US receipts before committing
-- [ ] Minimum bill history required before Layer 2 insights are shown (avoid misleading data)
-- [ ] How to handle bills with no itemization (flat totals only) in the classification pipeline
-- [ ] PDF parsing: native PDF text extraction first, OCR fallback for scanned PDFs
+- [ ] Minimum bill history before Layer 2 insights are shown — currently 5 bills for personality, need to decide for fairness delta and settlement streak
+- [ ] How to handle flat-total bills (no itemization) in the classifier — currently falls through to manual assignment
+- [ ] PDF parsing (V1): native text extraction first, ML Kit OCR fallback for scanned PDFs
 
 ---
 
 ## Release Log
 
-| Date | Update |
-|---|---|
-| 2026-05-10 | MLE scope defined, design decisions logged for OCR pipeline approach |
+| Date | Module | Update |
+|---|---|---|
+| 2026-05-10 | — | MLE scope defined, design decisions logged |
+| 2026-05-14 | OCR parser | Classifier, extractor, parser complete — 91 tests, 7 real receipts |
+| 2026-05-14 | Analytics | Aggregator and personality complete — 32 tests |
+| 2026-05-18 | Analytics | Storage manager and exporter complete — 21 tests, all modules done |
+| 2026-05-18 | — | All MLE branches merged to main. ML Kit integration is next. |

@@ -192,7 +192,7 @@ No hard dates — this is a two-person team with day jobs. Milestones not sprint
 
 ## Open Decisions (pre-MVP)
 
-- [x] Local-first storage: **SQLite local-first, no Supabase sync for MVP.** Supabase brought in later (V1/V2) only when we need server-side user analytics telemetry (aggregate spend patterns, retention signals). Bill data stays on-device. Rationale: privacy, zero-friction onboarding, no account required to use the app. See ARCHITECTURE.md.
+- [x] Local-first storage: **SQLite local-first + Supabase sync from day one.** SQLite is the primary store (offline works, split math never hits the network). Supabase syncs group bills, membership, and settlements so all members stay in sync. Receipt images stay on-device (ML Kit OCR is on-device). Aggregate user analytics telemetry added in V2 on top of the same Supabase instance. See ARCHITECTURE.md.
 - [x] OCR approach: Google ML Kit on-device — decided, rationale in ARCHITECTURE.md
 - [x] Settlement traceability: `settlement_expense_links` junction table added in migration 002 (SWE)
 - [x] `country` field on groups: added in migration 002, unblocks tax rule engine and ML Kit parsing mode

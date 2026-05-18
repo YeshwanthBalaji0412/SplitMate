@@ -195,8 +195,8 @@ Debt graph simplification using a min-flow algorithm:
 ## Key Architectural Tradeoffs
 
 ### Local-first vs cloud-first
-**Chose:** Local-first (SQLite). No Supabase sync in MVP or V1.
-**Why:** Privacy, offline use, zero-friction onboarding (no account required). Bill data never leaves the device unless the user explicitly exports it. Supabase introduced in V2 or later — only for server-side aggregate analytics telemetry (retention signals, spend trends across users) where individual bill data is not sent. Group sync via Supabase is a future option but not a target until cloud analytics are needed.
+**Chose:** Local-first (SQLite primary) + Supabase sync from day one.
+**Why:** Group sync is a core requirement — members need to see each other's bills in real time. SQLite on-device is the primary store (app works offline, reads are fast, no round-trips for split math). Supabase is the sync and auth layer: bill data, group membership, and settlements replicate to Supabase so all group members stay in sync. Receipt images never leave the device (OCR is on-device via ML Kit). Aggregate user analytics telemetry (spend trends, retention signals across users) is a V2 addition on top of the same Supabase instance.
 
 ### Rule-based split engine vs ML
 **Chose:** Fully deterministic rule engine for all split math.

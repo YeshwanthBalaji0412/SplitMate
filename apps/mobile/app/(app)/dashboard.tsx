@@ -59,6 +59,9 @@ export default function DashboardScreen() {
           <TouchableOpacity style={[styles.actionBtn, styles.joinBtn]} onPress={() => router.push('/(app)/groups/join')}>
             <Text style={[styles.actionText, styles.joinText]}>Join</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.reportBtn]} onPress={() => router.push('/(app)/report')}>
+            <Text style={[styles.actionText, styles.reportText]}>My Report</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -105,6 +108,8 @@ const styles = StyleSheet.create({
   actionText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   joinBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#16a34a' },
   joinText: { color: '#16a34a' },
+  reportBtn: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#6b7280' },
+  reportText: { color: '#374151' },
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#374151' },
   emptySubtitle: { fontSize: 14, color: '#9ca3af', marginTop: 6, textAlign: 'center' },

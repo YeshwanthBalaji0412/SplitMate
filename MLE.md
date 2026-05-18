@@ -18,8 +18,8 @@
 | Storage manager | `analytics` | `layer2-intelligence` → main | **Complete** | 11 |
 | Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
 | ML Kit integration | `mobile` | `mlkit-integration` → main | **Complete** | — |
-| Confidence correction UX | `mobile` | `ocr-correction-ux` | **In progress** | — |
-| **SQLite query layer** | `mobile` | next branch | **Up next** | — |
+| Confidence correction UX | `mobile` | `ocr-correction-ux` → main | **Complete** | — |
+| SQLite query layer | `mobile` | `sqlite-query-layer` | **In progress** | — |
 
 ---
 
@@ -97,17 +97,24 @@ Longitudinal intelligence layer. Takes `BillRecord[]` from the caller, returns p
 
 ---
 
-### Module 6 — SQLite Query Layer
-**Branch:** off `main` after Module 5 merges
-**Depends on:** Supabase sync wired by SWE, analytics package complete (✓)
+### Module 6 — SQLite Query Layer ✓ in progress
+**Branch:** `sqlite-query-layer`
+**Depends on:** Supabase sync (✓ wired by SWE), analytics package (✓ complete)
 
-The `analytics` package takes `BillRecord[]` — someone has to fetch those from the local database. This module is the bridge:
+**Built:**
 
-- Query layer: `getBillsForUser(userId, window)` → `BillRecord[]` from SQLite
-- Maps Supabase/SQLite rows to the `BillRecord` shape the analytics package expects
-- Called by the monthly report screen: fetch → pass to `computeMonthlyReport` → render
+`useBillRecords(userId, window)` — fetches expenses from Supabase where user is a participant in the given date window. Joins `expense_participants`, `line_items`, and `line_item_participants` in a single call. Maps the DB shape to `BillRecord[]` for the analytics package.
 
-**Deliverable:** Monthly report screen shows real data from the user's local bill history.
+Key mapping decisions:
+- DB `'utility'` → analytics `'utilities'` (only naming difference between the two type sets)
+- `settledAt`: derived from `expense.updated_at` when `status = 'settled'` — pragmatic approximation until SWE adds a dedicated `settled_at` column to expenses
+- `item.category`: defaults to `'other'` — will be populated once OCR item classification writes category to `line_items` (future SWE column)
+
+`report.tsx` — monthly report screen. Calls `useBillRecords` → `computeMonthlyReport` → renders: total spent, category breakdown with proportional bars, fairness signal, settlement stats (avg days + streak), spending personality card (if 5+ bills). CSV and JSON export via `expo-sharing`. Accessible from dashboard via "My Report" button.
+
+**Known approximations to flag to Yeshwanth:**
+- `expenses` needs a `settled_at` column for accurate settlement date tracking
+- `line_items` needs a `category` column for per-item tax allocation in analytics
 
 ---
 
@@ -185,4 +192,5 @@ The `analytics` package takes `BillRecord[]` — someone has to fetch those from
 | 2026-05-18 | Analytics | Storage manager and exporter complete — 21 tests, all modules done |
 | 2026-05-18 | — | All MLE branches merged to main. ML Kit integration is next. |
 | 2026-05-18 | ML Kit integration | `useOcrScanner` + `useReceiptAsset` + bill-entry pre-fill complete. Merged to main. |
-| 2026-05-18 | Confidence correction UX | `useFlaggedFields` + amber highlight treatment + date field + live badge countdown. On `ocr-correction-ux` branch. |
+| 2026-05-18 | Confidence correction UX | `useFlaggedFields` + amber highlight treatment + date field + live badge countdown. Merged to main. |
+| 2026-05-18 | SQLite query layer | `useBillRecords` + `report.tsx` complete. On `sqlite-query-layer` branch. |

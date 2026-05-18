@@ -131,7 +131,7 @@ Users set split rules once per group for utility bills — stored as a template,
 
 ## Open Questions
 
-- [ ] Local-first vs Supabase-primary: decision needed — SQLite local with optional Supabase sync, or Supabase as primary with offline cache?
+- [x] Local-first vs Supabase-primary: **SQLite local-first + Supabase sync from day one** — decided 2026-05-18, see ARCHITECTURE.md
 - [ ] Settlement optimizer: how to handle partial settlements (paying off one bill from a multi-bill debt)?
 - [ ] Bill schema versioning: how do we handle schema evolution without breaking existing stored bills?
 
@@ -142,3 +142,8 @@ Users set split rules once per group for utility bills — stored as a template,
 | Date | Update |
 |---|---|
 | 2026-05-10 | SWE scope defined, core architectural decisions logged |
+| 2026-05-18 | Schema migrations 001+002, types, split engine, mobile skeleton merged to main |
+
+---
+
+*For current build status and next actions → [TRACKER.md](TRACKER.md)*

@@ -178,26 +178,6 @@
 
 ---
 
-## MLE Progress Tracker
-
-> One-module-at-a-time. Each module merges to main before the next starts. Full detail in [MLE.md](MLE.md).
-
-| # | Module | Branch | Status |
-|---|---|---|---|
-| 1 | Item classifier + field extractor + receipt parser | `data_schema` → main | ✅ Complete — 91 tests, 7 real receipts |
-| 2 | Analytics aggregator + fairness + settlement streak | `layer2-intelligence` → main | ✅ Complete — 32 tests |
-| 3 | Spending personality + storage manager + report exporter | `layer2-intelligence` → main | ✅ Complete — 21 tests |
-| 4 | ML Kit integration — scan → pre-fill bill entry | `mlkit-integration` → main | ✅ Complete |
-| 5 | Confidence correction UX — flagged field highlights | `ocr-correction-ux` → main | ✅ Complete |
-| 6 | SQLite query layer — feed analytics from local DB | `sqlite-query-layer` → main | ✅ Complete |
-
-**Pending SWE actions (flagged to Yeshwanth):**
-- `receipt_assets.storage_path` — needs Supabase Storage upload step (local URI is placeholder)
-- `expenses` — needs `settled_at` column for accurate settlement date tracking
-- `line_items` — needs `category` column for per-item tax allocation in analytics
-
----
-
 ## Timeline Thinking
 
 No hard dates — this is a two-person team with day jobs. Milestones not sprints.
@@ -220,5 +200,5 @@ No hard dates — this is a two-person team with day jobs. Milestones not sprint
 ---
 
 *Owned by: Sruthi (MLE) + SWE Lead*
-*Last updated: 2026-05-18 — all MLE modules complete, 3 SWE schema items pending*
-*Cross-reference: [ARCHITECTURE.md](ARCHITECTURE.md) · [MLE.md](MLE.md) · [SWE.md](SWE.md)*
+*Last updated: 2026-05-18*
+*For current build status and next actions → [TRACKER.md](TRACKER.md)*

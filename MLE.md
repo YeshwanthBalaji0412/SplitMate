@@ -2,28 +2,12 @@
 
 **Owner:** Sruthi (ML Engineering Lead)
 **Scope:** OCR pipeline, item classification, confidence scoring, longitudinal intelligence, spending analytics
-**Roadmap reference:** [PLAN.md](PLAN.md)
+
+> For current status and next actions, see [TRACKER.md](TRACKER.md). This file is the implementation reference — design decisions, module specs, and the release log.
 
 ---
 
-## Status Overview
-
-| Module | Package | Branch | Status | Tests |
-|---|---|---|---|---|
-| Item classifier | `ocr-parser` | `data_schema` → main | **Complete** | 57 |
-| Field extractor | `ocr-parser` | `data_schema` → main | **Complete** | 40 |
-| Receipt parser | `ocr-parser` | `data_schema` → main | **Complete** | 7 real receipts (snapshot) |
-| Analytics aggregator | `analytics` | `layer2-intelligence` → main | **Complete** | 32 |
-| Spending personality | `analytics` | `layer2-intelligence` → main | **Complete** | covered via aggregator |
-| Storage manager | `analytics` | `layer2-intelligence` → main | **Complete** | 11 |
-| Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
-| ML Kit integration | `mobile` | `mlkit-integration` → main | **Complete** | — |
-| Confidence correction UX | `mobile` | `ocr-correction-ux` → main | **Complete** | — |
-| SQLite query layer | `mobile` | `sqlite-query-layer` → main | **Complete** | — |
-
----
-
-## What's Done
+## What's Been Built
 
 ### OCR Parser — `packages/ocr-parser`
 

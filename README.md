@@ -30,12 +30,9 @@ SplitMate is built on one principle: every rupee and dollar in a group expense m
 
 ## Bill Categories
 
-Supports 6 real-world bill types + a general custom format:
-
 - **Restaurant / Dining** — itemized, tip or service charge, GST/sales tax
 - **Grocery** — itemized, tax by item category
 - **Food Delivery** — items + delivery fee + platform fee + surge, country-aware fee rules
-- **Accommodation / Travel** — flat or per-night, equal or rule-based split
 - **Utilities** — flat total, rules set once and reused (by room, person, usage %)
 - **Subscriptions / Entertainment** — flat, one-time or recurring, equal or tiered
 - **General / Custom** — freeform, user-defined rules
@@ -45,13 +42,13 @@ Supports 6 real-world bill types + a general custom format:
 ## Core Features
 
 - Swipe-to-claim item assignment — fast, works for any bill type
-- Fee rule engine — configurable allocation per fee type
-- Per-person explainability view — receipt-style breakdown
+- Fee rule engine — configurable allocation per fee type, country-aware (GST/sales tax)
+- Per-person explainability view — receipt-style breakdown, every line traced
 - Settlement traceability — debt graph with source bill context
 - Settlement optimization — minimize transactions, visually explained
+- OCR receipt parsing — on-device via ML Kit, confidence-scored draft with correction UX
 - Group financial intelligence — spending trends, fairness scores, settlement behavior
-- Subtle gamification — settlement streaks, spending personality (data-backed)
-- OCR receipt parsing — photo, screenshot, or PDF upload with confidence-scored drafts
+- Spending personality — data-backed, subtle (Splurger / Even-Steven / Optimizer / Settler)
 - Pre-bill rule templates — set utility/subscription rules once, reuse forever
 
 ---
@@ -60,33 +57,49 @@ Supports 6 real-world bill types + a general custom format:
 
 | Layer | Technology |
 |---|---|
-| Web | Next.js, TypeScript, Tailwind CSS |
-| Mobile | React Native + Expo |
-| Backend | Supabase (Postgres, Auth, Storage) |
-| OCR | Google ML Kit (on-device, ~15MB, Android + iOS, zero network calls) |
-| Split Engine | Rule-based, deterministic, fully auditable |
+| Mobile | React Native + Expo (Android + iOS) |
+| Web | Next.js, TypeScript, Tailwind CSS (post-MVP) |
+| Backend | Supabase (Postgres, Auth, Storage) — sync layer |
+| Local store | SQLite via Expo — primary store, offline-first |
+| OCR | Google ML Kit (on-device, ~15MB, zero network calls, receipt never leaves device) |
+| Split engine | Rule-based, deterministic, fully auditable — no ML in the money layer |
+| Analytics | On-demand computation from local bill data — no persistent cache |
 
 ---
 
 ## Team
 
-**Software Engineering Lead** — architecture, frontend, backend, split engine, settlement optimizer
+**Yeshwanth (SWE Lead)** — architecture, schema, split engine, settlement optimizer, mobile app, backend
 
-**ML Engineering Lead** — OCR pipeline, item classification, confidence scoring, longitudinal intelligence, spending analytics
-
----
-
-## Status
-
-| Milestone | Status | Date |
-|---|---|---|
-| Vision and architecture design | ✅ Complete | May 2026 |
-| Bill data model and schema | 🔄 In Progress | — |
-| Split engine core | — | — |
-| OCR pipeline v1 | — | — |
-| Web app MVP | — | — |
-| Mobile app | — | — |
+**Sruthi (MLE Lead)** — OCR pipeline, item classification, confidence scoring, longitudinal intelligence, spending analytics
 
 ---
 
-*See [ARCHITECTURE.md](ARCHITECTURE.md) for system design decisions. See [MLE.md](MLE.md) and [SWE.md](SWE.md) for domain-specific engineering logs.*
+## Build Status
+
+| Component | Status |
+|---|---|
+| Data schema (migrations 001 + 002) | ✅ Complete |
+| Split engine + settlement optimizer | ✅ Complete |
+| OCR parser (classify → extract → parse, 91 tests) | ✅ Complete |
+| Analytics Layer 2 (aggregator, personality, storage, export, 53 tests) | ✅ Complete |
+| ML Kit scan → bill entry pre-fill + correction UX | ✅ Complete |
+| Monthly report screen | ✅ Complete |
+| Mobile app screen skeleton | ✅ Complete |
+| Split engine wired into bill assignment flow | ⏳ In progress (SWE) |
+| Settlement optimizer wired to settlement screen | ⏳ In progress (SWE) |
+| Real-device QA | ⏳ Pending |
+
+> **Engineers:** See [TRACKER.md](TRACKER.md) for current status, next actions, and a map of all project docs.
+
+---
+
+## Project Docs
+
+| File | Purpose |
+|---|---|
+| [TRACKER.md](TRACKER.md) | **Start here** — live status, next actions, doc map |
+| [PLAN.md](PLAN.md) | Full product roadmap — MVP/V1/V2, feature rationale |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System design decisions and tradeoffs |
+| [MLE.md](MLE.md) | MLE implementation log — OCR, analytics, design decisions |
+| [SWE.md](SWE.md) | SWE implementation log — split engine, schema, mobile |

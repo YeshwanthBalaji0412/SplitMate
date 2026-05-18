@@ -7,10 +7,14 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import type { BillType } from '@split-smart/types';
+import { useOcrScanner } from '@/hooks/useOcrScanner';
+import { useReceiptAsset } from '@/hooks/useReceiptAsset';
+import type { BillType, CountryCode } from '@split-smart/types';
+import type { Country } from '@split-smart/ocr-parser';
 
 const BILL_TYPES: { value: BillType; label: string }[] = [
   { value: 'restaurant', label: 'Restaurant' },
@@ -32,6 +36,32 @@ interface ChargeInput {
   type: 'sales_tax' | 'delivery_fee' | 'service_fee' | 'gratuity' | 'discount';
 }
 
+// Maps the ocr-parser BillType (no 'subscription'/'accommodation') to the
+// @split-smart/types BillType for the expense row.
+function toExpenseBillType(ocrType: string): BillType {
+  const map: Record<string, BillType> = {
+    restaurant: 'restaurant',
+    grocery: 'grocery',
+    delivery: 'delivery',
+    utility: 'utility',
+  };
+  return map[ocrType] ?? 'custom';
+}
+
+// Maps @split-smart/types BillType → ocr-parser BillType.
+// subscription and accommodation have no OCR mode — fall back to custom.
+import type { BillType as OcrBillType } from '@split-smart/ocr-parser';
+function toOcrBillType(t: BillType): OcrBillType {
+  const map: Partial<Record<BillType, OcrBillType>> = {
+    restaurant: 'restaurant',
+    grocery: 'grocery',
+    delivery: 'delivery',
+    utility: 'utility',
+    custom: 'custom',
+  };
+  return map[t] ?? 'custom';
+}
+
 export default function BillEntryScreen() {
   const { id: groupId } = useLocalSearchParams<{ id: string }>();
   const [title, setTitle] = useState('');
@@ -39,13 +69,75 @@ export default function BillEntryScreen() {
   const [items, setItems] = useState<LineItemInput[]>([{ name: '', quantity: '1', unitPrice: '' }]);
   const [charges, setCharges] = useState<ChargeInput[]>([]);
   const [currency, setCurrency] = useState('USD');
+  const [country, setCountry] = useState<Country>('US');
   const [loading, setLoading] = useState(false);
 
+  const { state: scanState, scan, reset: resetScan } = useOcrScanner(country, toOcrBillType(billType));
+  const { createAsset, markDone, markFailed } = useReceiptAsset();
+
   useEffect(() => {
-    // Fetch group currency
-    supabase.from('groups').select('currency').eq('id', groupId).single()
-      .then(({ data }) => { if (data) setCurrency(data.currency); });
+    supabase
+      .from('groups')
+      .select('currency, country')
+      .eq('id', groupId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setCurrency(data.currency);
+          setCountry((data.country as CountryCode) === 'IN' ? 'IN' : 'US');
+        }
+      });
   }, [groupId]);
+
+  // When a draft arrives, pre-fill the form.
+  useEffect(() => {
+    if (scanState.status !== 'done') return;
+    const { draft } = scanState;
+
+    if (draft.merchantName) setTitle(draft.merchantName);
+    if (draft.billType) setBillType(toExpenseBillType(draft.billType));
+
+    if (draft.items.length > 0) {
+      setItems(
+        draft.items.map((item: { name: string; quantity: number; unitPrice: number }) => ({
+          name: item.name,
+          quantity: String(item.quantity),
+          unitPrice: String(item.unitPrice),
+        }))
+      );
+    }
+
+    if (draft.charges.length > 0) {
+      const chargeTypeMap: Record<string, ChargeInput['type']> = {
+        sales_tax: 'sales_tax',
+        state_tax: 'sales_tax',
+        city_tax: 'sales_tax',
+        delivery_fee: 'delivery_fee',
+        service_fee: 'service_fee',
+        platform_fee: 'service_fee',
+        gratuity: 'gratuity',
+        discount: 'discount',
+      };
+      setCharges(
+        draft.charges.map((c: { label: string; amount: number; type: string }) => ({
+          label: c.label,
+          amount: String(c.amount),
+          type: chargeTypeMap[c.type] ?? 'service_fee',
+        }))
+      );
+    }
+  }, [scanState]);
+
+  // Show a non-blocking banner if scan fails.
+  useEffect(() => {
+    if (scanState.status === 'failed') {
+      Alert.alert(
+        'Scan failed',
+        `${scanState.reason}. You can enter the bill manually.`,
+        [{ text: 'OK', onPress: resetScan }]
+      );
+    }
+  }, [scanState, resetScan]);
 
   const addItem = () => setItems([...items, { name: '', quantity: '1', unitPrice: '' }]);
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
@@ -55,9 +147,8 @@ export default function BillEntryScreen() {
     setItems(updated);
   };
 
-  const addCharge = (type: ChargeInput['type'], label: string) => {
+  const addCharge = (type: ChargeInput['type'], label: string) =>
     setCharges([...charges, { label, amount: '', type }]);
-  };
   const removeCharge = (i: number) => setCharges(charges.filter((_, idx) => idx !== i));
   const updateChargeAmount = (i: number, amount: string) => {
     const updated = [...charges];
@@ -89,7 +180,6 @@ export default function BillEntryScreen() {
 
     const total = computeTotal();
 
-    // Create expense
     const { data: expense, error: expError } = await supabase
       .from('expenses')
       .insert({
@@ -114,7 +204,12 @@ export default function BillEntryScreen() {
       return;
     }
 
-    // Insert line items
+    // If this bill came from a scan, persist the receipt asset + parse metadata.
+    if (scanState.status === 'done') {
+      const assetId = await createAsset(expense.id, scanState.imageUri, user.id);
+      if (assetId) await markDone(assetId, scanState.draft);
+    }
+
     const lineItemRows = validItems.map((item, i) => ({
       expense_id: expense.id,
       name: item.name.trim(),
@@ -125,7 +220,6 @@ export default function BillEntryScreen() {
     }));
     await supabase.from('line_items').insert(lineItemRows);
 
-    // Insert charge components
     const chargeRows = charges
       .filter((c) => parseFloat(c.amount) > 0)
       .map((c, i) => ({
@@ -141,7 +235,6 @@ export default function BillEntryScreen() {
       await supabase.from('charge_components').insert(chargeRows);
     }
 
-    // Add all group members as participants
     const { data: groupMembers } = await supabase
       .from('group_members')
       .select('user_id')
@@ -160,16 +253,54 @@ export default function BillEntryScreen() {
     }
 
     setLoading(false);
-    // Go to item assignment screen so users can claim items
     router.replace(`/(app)/groups/${groupId}/assign-items?expenseId=${expense.id}`);
   }
 
   const sym = currency === 'INR' ? '₹' : '$';
+  const isScanning = scanState.status === 'picking' || scanState.status === 'processing';
+  const wasScanned = scanState.status === 'done';
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+
+      {/* Scan button */}
+      <TouchableOpacity
+        style={[styles.scanBtn, isScanning && styles.scanBtnDisabled]}
+        onPress={scan}
+        disabled={isScanning}
+      >
+        {isScanning ? (
+          <View style={styles.scanBtnInner}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.scanBtnText}>
+              {scanState.status === 'picking' ? 'Picking image…' : 'Scanning…'}
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.scanBtnText}>
+            {wasScanned ? '📷 Re-scan receipt' : '📷 Scan receipt'}
+          </Text>
+        )}
+      </TouchableOpacity>
+
+      {wasScanned && (
+        <View style={styles.scanBadge}>
+          <Text style={styles.scanBadgeText}>
+            Pre-filled from scan
+            {scanState.draft.flaggedFields.length > 0
+              ? ` · ${scanState.draft.flaggedFields.length} field${scanState.draft.flaggedFields.length > 1 ? 's' : ''} need review`
+              : ' · all fields confident'}
+          </Text>
+        </View>
+      )}
+
       <Text style={styles.label}>Bill title</Text>
-      <TextInput style={styles.input} placeholder="e.g. Dinner at Mainland China" value={title} onChangeText={setTitle} />
+      <TextInput
+        style={styles.input}
+        placeholder="e.g. Dinner at Mainland China"
+        value={title}
+        onChangeText={setTitle}
+      />
 
       <Text style={styles.label}>Bill type</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
@@ -180,13 +311,14 @@ export default function BillEntryScreen() {
               style={[styles.chip, billType === t.value && styles.chipActive]}
               onPress={() => setBillType(t.value)}
             >
-              <Text style={[styles.chipText, billType === t.value && styles.chipTextActive]}>{t.label}</Text>
+              <Text style={[styles.chipText, billType === t.value && styles.chipTextActive]}>
+                {t.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       </ScrollView>
 
-      {/* Line Items */}
       <Text style={styles.sectionTitle}>Items</Text>
       {items.map((item, i) => (
         <View key={i} style={styles.itemRow}>
@@ -212,7 +344,7 @@ export default function BillEntryScreen() {
           />
           {items.length > 1 && (
             <TouchableOpacity onPress={() => removeItem(i)} style={styles.removeBtn}>
-              <Text style={styles.removeText}>x</Text>
+              <Text style={styles.removeText}>×</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -221,7 +353,6 @@ export default function BillEntryScreen() {
         <Text style={styles.addText}>+ Add item</Text>
       </TouchableOpacity>
 
-      {/* Charges */}
       <Text style={styles.sectionTitle}>Charges & Taxes</Text>
       {charges.map((c, i) => (
         <View key={i} style={styles.chargeRow}>
@@ -234,7 +365,7 @@ export default function BillEntryScreen() {
             onChangeText={(v) => updateChargeAmount(i, v)}
           />
           <TouchableOpacity onPress={() => removeCharge(i)} style={styles.removeBtn}>
-            <Text style={styles.removeText}>x</Text>
+            <Text style={styles.removeText}>×</Text>
           </TouchableOpacity>
         </View>
       ))}
@@ -253,14 +384,13 @@ export default function BillEntryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Total */}
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>Total</Text>
         <Text style={styles.totalAmount}>{sym}{computeTotal().toFixed(2)}</Text>
       </View>
 
       <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={loading}>
-        <Text style={styles.submitText}>{loading ? 'Saving...' : 'Save Bill'}</Text>
+        <Text style={styles.submitText}>{loading ? 'Saving…' : 'Save Bill'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -269,11 +399,30 @@ export default function BillEntryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   content: { padding: 20, paddingBottom: 40 },
+  scanBtn: {
+    backgroundColor: '#16a34a', borderRadius: 10, paddingVertical: 13,
+    alignItems: 'center', marginBottom: 6,
+  },
+  scanBtnDisabled: { backgroundColor: '#86efac' },
+  scanBtnInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scanBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  scanBadge: {
+    backgroundColor: '#f0fdf4', borderRadius: 8, paddingHorizontal: 12,
+    paddingVertical: 6, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0',
+  },
+  scanBadgeText: { fontSize: 13, color: '#15803d' },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 6, marginTop: 12 },
-  input: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, backgroundColor: '#fff', color: '#111827' },
+  input: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10, fontSize: 15,
+    backgroundColor: '#fff', color: '#111827',
+  },
   chipScroll: { marginBottom: 4 },
   chips: { flexDirection: 'row', gap: 8 },
-  chip: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, backgroundColor: '#fff' },
+  chip: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7, backgroundColor: '#fff',
+  },
   chipActive: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
   chipText: { fontSize: 13, color: '#6b7280' },
   chipTextActive: { color: '#fff', fontWeight: '600' },
@@ -282,19 +431,31 @@ const styles = StyleSheet.create({
   itemName: { flex: 3 },
   itemQty: { flex: 1, textAlign: 'center' },
   itemPrice: { flex: 2, textAlign: 'right' },
-  removeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
-  removeText: { color: '#dc2626', fontWeight: '700', fontSize: 13 },
+  removeBtn: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center',
+  },
+  removeText: { color: '#dc2626', fontWeight: '700', fontSize: 15 },
   addBtn: { paddingVertical: 8 },
   addText: { color: '#16a34a', fontWeight: '600', fontSize: 14 },
   chargeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   chargeLabel: { flex: 2, fontSize: 14, color: '#374151' },
   chargeAmount: { flex: 1, textAlign: 'right' },
   chargeButtons: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  chargeAddBtn: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff' },
+  chargeAddBtn: {
+    borderWidth: 1, borderColor: '#d1d5db', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#fff',
+  },
   chargeAddText: { fontSize: 13, color: '#6b7280' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
+  totalRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#e5e7eb',
+  },
   totalLabel: { fontSize: 18, fontWeight: '700', color: '#111827' },
   totalAmount: { fontSize: 22, fontWeight: '700', color: '#16a34a' },
-  submitBtn: { backgroundColor: '#16a34a', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  submitBtn: {
+    backgroundColor: '#16a34a', borderRadius: 10,
+    paddingVertical: 14, alignItems: 'center', marginTop: 20,
+  },
   submitText: { color: '#fff', fontWeight: '600', fontSize: 16 },
 });

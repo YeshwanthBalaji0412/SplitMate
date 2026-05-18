@@ -189,9 +189,12 @@
 | 3 | Spending personality + storage manager + report exporter | `layer2-intelligence` → main | ✅ Complete — 21 tests |
 | 4 | ML Kit integration — scan → pre-fill bill entry | `mlkit-integration` → main | ✅ Complete |
 | 5 | Confidence correction UX — flagged field highlights | `ocr-correction-ux` → main | ✅ Complete |
-| 6 | SQLite query layer — feed analytics from local DB | `sqlite-query-layer` | 🔄 In progress |
+| 6 | SQLite query layer — feed analytics from local DB | `sqlite-query-layer` → main | ✅ Complete |
 
-**Pending SWE action:** `receipt_assets.storage_path` needs Supabase Storage upload step (local URI is placeholder). Flag to Yeshwanth before Module 5.
+**Pending SWE actions (flagged to Yeshwanth):**
+- `receipt_assets.storage_path` — needs Supabase Storage upload step (local URI is placeholder)
+- `expenses` — needs `settled_at` column for accurate settlement date tracking
+- `line_items` — needs `category` column for per-item tax allocation in analytics
 
 ---
 
@@ -217,5 +220,5 @@ No hard dates — this is a two-person team with day jobs. Milestones not sprint
 ---
 
 *Owned by: Sruthi (MLE) + SWE Lead*
-*Last updated: 2026-05-18 — MLE module 6 in progress*
+*Last updated: 2026-05-18 — all MLE modules complete, 3 SWE schema items pending*
 *Cross-reference: [ARCHITECTURE.md](ARCHITECTURE.md) · [MLE.md](MLE.md) · [SWE.md](SWE.md)*

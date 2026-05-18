@@ -19,7 +19,7 @@
 | Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
 | ML Kit integration | `mobile` | `mlkit-integration` → main | **Complete** | — |
 | Confidence correction UX | `mobile` | `ocr-correction-ux` → main | **Complete** | — |
-| SQLite query layer | `mobile` | `sqlite-query-layer` | **In progress** | — |
+| SQLite query layer | `mobile` | `sqlite-query-layer` → main | **Complete** | — |
 
 ---
 

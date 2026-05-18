@@ -202,9 +202,9 @@ Edge cases by function:
 | Module | Status | Tests |
 |---|---|---|
 | `types.ts` | Complete | — (types only) |
-| `aggregator.ts` | In progress | — |
-| `personality.ts` | Stub | — |
-| `storage.ts` | Stub | — |
-| `exporter.ts` | Stub | — |
+| `aggregator.ts` | Complete | 32 tests |
+| `personality.ts` | Complete | — (covered via aggregator integration) |
+| `storage.ts` | Complete | 11 tests |
+| `exporter.ts` | Complete | 10 tests |
 
-*Last updated: 2026-05-14*
+*Last updated: 2026-05-18*

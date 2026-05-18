@@ -1,0 +1,22 @@
+Uber Eats
+F0006
+Placed: Mon May 11 at 4:05 PM
+Prepare by
+Mon May 11 at 4:35 PM
+Customer Info
+Tyler B.
+Delivery
+Order Details:
+1X King's Experience $369.00
+Sauce
+- House Special Big Easy (blend of
+Lemon Pepper, Cajun Garlic Butter, and
+Rajun Cajun)
+Spice Level
+- Medium
+Sub total: $369.00
+Tax: $37.28
+Tip: $0.00
+Total: $406.28
+PREPAID - Do Not Charge
+Ordermark omid-0000-6480

@@ -1,0 +1,500 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parser snapshots — real receipts > in-delivery-01: Indian delivery receipt (no GST line, container charge) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 30,
+      "confidence": 0.9,
+      "label": "Container Charge",
+      "type": "service_fee",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.6,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "IN",
+  "date": null,
+  "flaggedFields": [
+    "merchantName",
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Chicken Wings (4 Pc)",
+      "quantity": 1,
+      "totalPrice": 150,
+      "unitPrice": 150,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Garlic Mayonnaise",
+      "quantity": 1,
+      "totalPrice": 30,
+      "unitPrice": 30,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Peri Peri French Fries",
+      "quantity": 1,
+      "totalPrice": 120,
+      "unitPrice": 120,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Special Chicken Shawarma In Rumali",
+      "quantity": 1,
+      "totalPrice": 130,
+      "unitPrice": 130,
+    },
+  ],
+  "merchantName": null,
+  "subtotal": 430,
+  "total": 460,
+}
+`;
+
+exports[`parser snapshots — real receipts > in-restaurant-01: Indian restaurant receipt (GST-inclusive, SI numbers, Pk quantities) 1`] = `
+{
+  "billType": "restaurant",
+  "charges": [],
+  "confidenceScores": {
+    "charges": 0,
+    "date": 0.85,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "IN",
+  "date": "2025-09-07",
+  "flaggedFields": [
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "PAROTTA 9Pk",
+      "quantity": 1,
+      "totalPrice": 180,
+      "unitPrice": 180,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CHICKEN 65 1Pk",
+      "quantity": 1,
+      "totalPrice": 150,
+      "unitPrice": 150,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CHICKEN LOLIPOP 4Pk",
+      "quantity": 3,
+      "totalPrice": 200,
+      "unitPrice": 66.67,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "C.THOKKU BIRIYA 2Pk",
+      "quantity": 4,
+      "totalPrice": 280,
+      "unitPrice": 70,
+    },
+  ],
+  "merchantName": "HOTEL SATHAR ROWTHER",
+  "subtotal": 810,
+  "total": 810,
+}
+`;
+
+exports[`parser snapshots — real receipts > us-delivery-01: UberEats receipt (US, single item with modifiers, tax additive) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 37.28,
+      "confidence": 0.93,
+      "label": "Tax",
+      "rate": undefined,
+      "type": "state_tax",
+    },
+    {
+      "amount": 0,
+      "confidence": 0.88,
+      "label": "Tip",
+      "rate": undefined,
+      "type": "gratuity",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.6,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "King's Experience",
+      "quantity": 1,
+      "totalPrice": 369,
+      "unitPrice": 369,
+    },
+  ],
+  "merchantName": "Uber Eats",
+  "subtotal": 369,
+  "total": 406.28,
+}
+`;
+
+exports[`parser snapshots — real receipts > us-delivery-02: UberEats receipt (US, 2x quantity, delivery fee, order note block) 1`] = `
+{
+  "billType": "delivery",
+  "charges": [
+    {
+      "amount": 2.4,
+      "confidence": 0.93,
+      "label": "Tax",
+      "rate": undefined,
+      "type": "state_tax",
+    },
+    {
+      "amount": 0.99,
+      "confidence": 0.9,
+      "label": "Delivery Fee",
+      "type": "delivery_fee",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.92,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.9,
+    "total": 0.7,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "total",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "Classic Dig Bowl",
+      "quantity": 2,
+      "totalPrice": 27.08,
+      "unitPrice": 13.54,
+    },
+  ],
+  "merchantName": "Uber Eats #9E273",
+  "subtotal": 27.08,
+  "total": 30.47,
+}
+`;
+
+exports[`parser snapshots — real receipts > us-grocery-01: US grocery receipt (discounts, negative prices, payment lines, savings summary) 1`] = `
+{
+  "billType": "grocery",
+  "charges": [
+    {
+      "amount": -0.77,
+      "confidence": 0.82,
+      "label": "WH/SDL GR GRAPES SCP",
+      "type": "discount",
+    },
+    {
+      "amount": -2,
+      "confidence": 0.88,
+      "label": "$2 OFF $5 MEAT",
+      "type": "discount",
+    },
+    {
+      "amount": -2.29,
+      "confidence": 0.82,
+      "label": "NP BBY PLD CRT SCP",
+      "type": "discount",
+    },
+  ],
+  "confidenceScores": {
+    "charges": 0.84,
+    "date": 0,
+    "items": 0,
+    "merchantName": 0,
+    "subtotal": 0,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "merchantName",
+    "date",
+    "items",
+    "subtotal",
+  ],
+  "items": [],
+  "merchantName": null,
+  "subtotal": null,
+  "total": 20.41,
+}
+`;
+
+exports[`parser snapshots — real receipts > us-grocery-02: Green Supermarket (multi-line merchant, qty prefix items, no tax) 1`] = `
+{
+  "billType": "grocery",
+  "charges": [],
+  "confidenceScores": {
+    "charges": 0,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "APPLE",
+      "quantity": 2,
+      "totalPrice": 1,
+      "unitPrice": 0.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "BANANA",
+      "quantity": 3,
+      "totalPrice": 1.5,
+      "unitPrice": 0.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "ORANGE",
+      "quantity": 2,
+      "totalPrice": 1.2,
+      "unitPrice": 0.6,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "PEAR",
+      "quantity": 1,
+      "totalPrice": 0.75,
+      "unitPrice": 0.75,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "GRAPES",
+      "quantity": 2,
+      "totalPrice": 3,
+      "unitPrice": 1.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "STRAWBERRY",
+      "quantity": 1,
+      "totalPrice": 2.5,
+      "unitPrice": 2.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "BLUEBERRY",
+      "quantity": 1,
+      "totalPrice": 2,
+      "unitPrice": 2,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "KIWI",
+      "quantity": 2,
+      "totalPrice": 1.8,
+      "unitPrice": 0.9,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "WATERMELON",
+      "quantity": 1,
+      "totalPrice": 4.5,
+      "unitPrice": 4.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "LEMON",
+      "quantity": 1,
+      "totalPrice": 0.6,
+      "unitPrice": 0.6,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "RASPBERRY",
+      "quantity": 1,
+      "totalPrice": 3,
+      "unitPrice": 3,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "MILK",
+      "quantity": 1,
+      "totalPrice": 1.5,
+      "unitPrice": 1.5,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CHEESE",
+      "quantity": 1,
+      "totalPrice": 2.8,
+      "unitPrice": 2.8,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "YOGURT",
+      "quantity": 1,
+      "totalPrice": 1.2,
+      "unitPrice": 1.2,
+    },
+  ],
+  "merchantName": "Green Supermarket",
+  "subtotal": 27.35,
+  "total": 27.35,
+}
+`;
+
+exports[`parser snapshots — real receipts > us-grocery-03: Dollar Tree (N-suffix prices, OCR noise, tagline with price) 1`] = `
+{
+  "billType": "grocery",
+  "charges": [],
+  "confidenceScores": {
+    "charges": 0,
+    "date": 0,
+    "items": 0.78,
+    "merchantName": 0.8,
+    "subtotal": 0.65,
+    "total": 0.92,
+  },
+  "country": "US",
+  "date": null,
+  "flaggedFields": [
+    "date",
+    "charges",
+    "subtotal",
+  ],
+  "items": [
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "#IST CRUNCHY CHZ",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "#IST CRUNCHY CHZ",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CRACKES",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "SPRTBREAD COOKIE",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "ANIMAL CRACKERS",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "COSTAS CRACKERS",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "CRACKERS",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+    {
+      "category": "food",
+      "confidence": 0.78,
+      "name": "GRANOLA BARS 4CT",
+      "quantity": 1,
+      "totalPrice": 1,
+      "unitPrice": 1,
+    },
+  ],
+  "merchantName": "Dollar Tree Stores, Inc.",
+  "subtotal": 8,
+  "total": 9,
+}
+`;

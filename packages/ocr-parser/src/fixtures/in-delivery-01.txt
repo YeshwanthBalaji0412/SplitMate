@@ -1,0 +1,9 @@
+Item Qty. Price Amount
+Chicken Wings (4 Pc) 1 150.00 150.00
+Garlic Mayonnaise 1 30.00 30.00
+Peri Peri French Fries 1 120.00 120.00
+Special Chicken
+Shawarma In Rumali 1 130.00 130.00
+Total Qty: 4 Sub Total 430.00
+Container Charge 30.00
+Grand Total ₹ 460.00

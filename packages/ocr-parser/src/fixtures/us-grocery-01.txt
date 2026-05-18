@@ -1,0 +1,22 @@
+END EASYSHOP ORDER
+WH/SDL GR GRAPES SCP -0.77 *
+$2 OFF $5 MEAT -2.00 *
+NP BBY PLD CRT SCP -2.29 *
+Total 20.41
+EGift $10.00
+Total $10.41
+EGift $10.00
+Total $0.41
+Cash $0.41
+Total before savings $44.45
+Your Total Savings $24.04
+Total after savings $20.41
+Total $20.41
+Change $0.00
+YOUR SAVINGS SUMMARY
+Stop & Shop Card Savings $18.98
+PERSONAL THANKS SAVINGS 3 $5.06
+Total Stop & Shop Card Savings $24.04
+Your Total Savings $24.04
+***YEAR-TO-DATE SAVINGS*** $356.74
+* * * * * * * * * * * * * * * * *

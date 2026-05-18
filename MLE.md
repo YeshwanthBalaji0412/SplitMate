@@ -17,8 +17,8 @@
 | Spending personality | `analytics` | `layer2-intelligence` → main | **Complete** | covered via aggregator |
 | Storage manager | `analytics` | `layer2-intelligence` → main | **Complete** | 11 |
 | Report exporter | `analytics` | `layer2-intelligence` → main | **Complete** | 10 |
-| **ML Kit integration** | `mobile` | next branch | **Up next** | — |
-| Confidence correction UX | `mobile` | after ML Kit | Not started | — |
+| ML Kit integration | `mobile` | `mlkit-integration` | **In progress** | — |
+| **Confidence correction UX** | `mobile` | next branch | **Up next** | — |
 | SQLite query layer | `mobile` | after correction UX | Not started | — |
 
 ---
@@ -63,23 +63,19 @@ Longitudinal intelligence layer. Takes `BillRecord[]` from the caller, returns p
 
 ## What's Next — One Module at a Time
 
-### Module 4 — ML Kit Integration
-**Branch:** `mlkit-integration` (off `main`)
-**Depends on:** `country` field on groups (✓ in schema), `receipt_assets.parse_metadata` (✓ in schema)
+### Module 4 — ML Kit Integration ✓ in progress
+**Branch:** `mlkit-integration`
+**Depends on:** `country` field on groups (✓), `receipt_assets.parse_metadata` (✓)
 
-Wire the `ocr-parser` package into the React Native bill entry flow:
+**Built:**
 
-1. User taps "Scan receipt" → picks photo or screenshot from camera roll
-2. Pass image to `@react-native-ml-kit/text-recognition` → raw `TextLine[]`
-3. Pass `TextLine[]` + group `country` into `ocr-parser` pipeline → `ParsedBill` with confidence scores
-4. Write `parseStatus` and `parse_metadata` (confidence scores, flagged fields) to `receipt_assets` via Supabase
-5. Return bill JSON draft to bill entry form — pre-filled fields visible immediately
+`useOcrScanner(country, billType)` — 5-state machine (`idle → picking → processing → done | failed`). Requests camera roll permission, launches image picker, passes image URI to ML Kit, flattens the block/line/element hierarchy into `RawLine[]`, calls `parseReceipt`, returns `ParsedBillDraft`.
 
-**Deliverable:** A receipt photo produces a pre-filled bill entry form. No UI for correction yet — that's Module 5.
+`useReceiptAsset()` — Supabase lifecycle for `receipt_assets`: `createAsset` inserts with `status=processing`, `markDone` writes `parse_metadata` (confidence scores, flagged fields, item/charge counts) + `status=done`, `markFailed` writes the error reason.
 
-**What to coordinate with SWE:**
-- Bill entry screen needs to accept a `ParsedBill` draft as optional initial state
-- `receipt_assets` insert happens before parsing (status = `processing`), update after (status = `done` or `failed`)
+`bill-entry.tsx` — scan button pre-fills merchant name, bill type, items, and charges from the draft. Green badge shows flagged field count. Scan failure is a non-blocking alert — manual entry always works.
+
+**Open item for Yeshwanth:** `storage_path` in `receipt_assets` currently holds the local image URI. Needs a Supabase Storage upload step so the path becomes a real storage key. MLE side is complete — this is a SWE task.
 
 ---
 
@@ -184,3 +180,4 @@ The `analytics` package takes `BillRecord[]` — someone has to fetch those from
 | 2026-05-14 | Analytics | Aggregator and personality complete — 32 tests |
 | 2026-05-18 | Analytics | Storage manager and exporter complete — 21 tests, all modules done |
 | 2026-05-18 | — | All MLE branches merged to main. ML Kit integration is next. |
+| 2026-05-18 | ML Kit integration | `useOcrScanner` + `useReceiptAsset` + bill-entry pre-fill complete. On `mlkit-integration` branch. |

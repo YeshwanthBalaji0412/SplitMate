@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  Share,
 } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -148,6 +149,16 @@ export default function ReportScreen() {
           <Text style={styles.personalityLabel}>{report.spendingPersonality.label}</Text>
           <Text style={styles.personalityDesc}>{report.spendingPersonality.description}</Text>
           <Text style={styles.personalityMeta}>Based on {report.spendingPersonality.basedOnBills} bills</Text>
+          <TouchableOpacity
+            style={styles.sharePersonalityBtn}
+            onPress={() =>
+              Share.share({
+                message: `I'm ${report.spendingPersonality!.label} on SplitMate — ${report.spendingPersonality!.description} What's your spending personality?`,
+              })
+            }
+          >
+            <Text style={styles.sharePersonalityText}>Share my personality</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -215,6 +226,15 @@ const styles = StyleSheet.create({
   personalityLabel: { fontSize: 18, fontWeight: '700', color: '#15803d', marginBottom: 6 },
   personalityDesc: { fontSize: 14, color: '#374151', lineHeight: 20 },
   personalityMeta: { fontSize: 12, color: '#9ca3af', marginTop: 8 },
+  sharePersonalityBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#16a34a',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  sharePersonalityText: { fontSize: 13, fontWeight: '600', color: '#16a34a' },
 
   emptyCard: { alignItems: 'center', paddingVertical: 32 },
   emptyText: { fontSize: 16, fontWeight: '600', color: '#374151' },

@@ -55,8 +55,8 @@
 | # | Module | Location | Status |
 |---|---|---|---|
 | V1-1 | Group Financial Snapshot screen | `apps/mobile/src/hooks/useGroupStats.ts` + `apps/mobile/app/(app)/groups/[id]/group-stats.tsx` | ✅ 2026-05-20 |
-| V1-2 | Spending Personality enhancements — shareability + dashboard surface | TBD | ⏳ Next |
-| V1-3 | Fairness Tracking — 8-bill gate + private framing | `apps/mobile/app/(app)/report.tsx` | ⏳ |
+| V1-2 | Spending Personality enhancements — shareability + dashboard surface | `apps/mobile/app/(app)/report.tsx` + `apps/mobile/app/(app)/dashboard.tsx` | ✅ 2026-05-20 |
+| V1-3 | Fairness Tracking — 8-bill gate + private framing | `apps/mobile/app/(app)/report.tsx` | ✅ 2026-05-20 |
 | V1-4 | Item category write-back — OCR classifier output → `line_items.category` | Blocked on SWE column | ⏳ |
 | V1-5 | OCR Confidence Improvements | `packages/ocr-parser` | ⏳ |
 
@@ -69,7 +69,7 @@ MVP schema items (unblocked when SWE adds columns):
 - Update `useBillRecords` to read `line_items.category` for per-item tax analytics — one field addition in the map
 - Add more real receipt fixtures to `packages/ocr-parser/src/fixtures/` as edge cases are found in testing
 
-**V1 next up:** Spending Personality enhancements (V1-2) — personality card already in `report.tsx`, needs shareability (native Share) + surface as a card on the dashboard.
+**V1 next up:** Storage management UI (V1-4 after item category write-back unblocks) or OCR Confidence Improvements (V1-5). Item category write-back (V1-4) remains blocked on SWE adding `line_items.category`.
 
 ---
 

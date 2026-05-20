@@ -10,6 +10,16 @@ import {
 import { router } from 'expo-router';
 import { supabase } from '@/lib/supabase';
 import { useSession } from '@/providers/SessionProvider';
+import { useBillRecords } from '@/hooks/useBillRecords';
+import { computeMonthlyReport } from '@split-smart/analytics';
+
+function currentMonthWindow() {
+  const now = new Date();
+  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const to = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`;
+  return { from, to };
+}
 
 interface GroupRow {
   id: string;
@@ -24,6 +34,8 @@ export default function DashboardScreen() {
   const { session } = useSession();
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const { state: billState, fetch: fetchBills } = useBillRecords();
+  const window = currentMonthWindow();
 
   const fetchGroups = useCallback(async () => {
     if (!session) return;
@@ -36,13 +48,25 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    if (session?.user.id) fetchBills(session.user.id, window);
+  }, [fetchGroups, session?.user.id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchGroups();
+    await Promise.all([
+      fetchGroups(),
+      session?.user.id ? fetchBills(session.user.id, window) : Promise.resolve(),
+    ]);
     setRefreshing(false);
   };
+
+  // Derive insights quietly — no loading state, card just appears when ready.
+  const insights = (() => {
+    if (!session || billState.status !== 'done' || billState.records.length === 0) return null;
+    const report = computeMonthlyReport(session.user.id, billState.records, window);
+    if (!report.spendingPersonality && report.settlementStreakDays === 0) return null;
+    return { personality: report.spendingPersonality, streak: report.settlementStreakDays };
+  })();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -76,6 +100,27 @@ export default function DashboardScreen() {
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#16a34a" />}
           contentContainerStyle={styles.list}
+          ListHeaderComponent={insights ? (
+            <TouchableOpacity style={styles.insightCard} onPress={() => router.push('/(app)/report')}>
+              <View style={styles.insightTop}>
+                {insights.personality ? (
+                  <>
+                    <Text style={styles.insightPersonality}>{insights.personality.label}</Text>
+                    <Text style={styles.insightDesc} numberOfLines={1}>{insights.personality.description}</Text>
+                  </>
+                ) : (
+                  <Text style={styles.insightPersonality}>Your spending this month</Text>
+                )}
+                <Text style={styles.insightArrow}>›</Text>
+              </View>
+              {insights.streak > 0 && (
+                <View style={styles.insightStreak}>
+                  <Text style={styles.insightStreakCount}>{insights.streak}-bill streak</Text>
+                  <Text style={styles.insightStreakLabel}> · settled within 48hrs</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ) : null}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.groupCard}
@@ -121,4 +166,20 @@ const styles = StyleSheet.create({
   arrow: { fontSize: 22, color: '#d1d5db', fontWeight: '300' },
   signOut: { padding: 16, alignItems: 'center' },
   signOutText: { color: '#dc2626', fontSize: 14, fontWeight: '500' },
+
+  insightCard: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  insightTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  insightPersonality: { fontSize: 16, fontWeight: '700', color: '#15803d', flex: 1 },
+  insightDesc: { fontSize: 13, color: '#374151', marginTop: 3, flex: 1 },
+  insightArrow: { fontSize: 22, color: '#16a34a', fontWeight: '300', marginLeft: 8 },
+  insightStreak: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  insightStreakCount: { fontSize: 13, fontWeight: '600', color: '#15803d' },
+  insightStreakLabel: { fontSize: 13, color: '#6b7280' },
 });

@@ -200,4 +200,5 @@ Key design decisions:
 | 2026-05-18 | Confidence correction UX | `useFlaggedFields` + amber highlight treatment + date field + live badge countdown. Merged to main. |
 | 2026-05-18 | SQLite query layer | `useBillRecords` + `report.tsx` complete. Merged to main. |
 | 2026-05-20 | V1-1: Group Financial Snapshot | `useGroupStats` + `group-stats.tsx` + Group Stats button in group index. Merged to main. |
-| 2026-05-20 | V1-2: Spending Personality enhancements | Share button on personality card in `report.tsx`. Insights teaser card (personality + streak) on dashboard as ListHeaderComponent. On `v1-personality-ui` branch. |
+| 2026-05-20 | V1-2: Spending Personality enhancements | Share button on personality card in `report.tsx`. Insights teaser card (personality + streak) on dashboard as ListHeaderComponent. Merged to main. |
+| 2026-05-20 | V1-3: Fairness Tracking UI | 8-bill gate + locked progress bar + unlocked two-column share comparison in `report.tsx`. On `v1-fairness-ui` branch. |

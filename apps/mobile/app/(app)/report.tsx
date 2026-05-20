@@ -116,15 +116,49 @@ export default function ReportScreen() {
         </View>
       )}
 
-      {/* Fairness signal */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Fairness</Text>
-        <Text style={styles.fairnessLabel}>
-          {report.fairnessLabel === 'even' && '↔ You split evenly with your groups'}
-          {report.fairnessLabel === 'overpaying' && `↑ You paid ${sym}${Math.abs(report.fairnessDelta).toFixed(2)} more than an equal split on average`}
-          {report.fairnessLabel === 'underpaying' && `↓ You paid ${sym}${Math.abs(report.fairnessDelta).toFixed(2)} less than an equal split on average`}
-        </Text>
-      </View>
+      {/* Fairness — gated at 8 bills */}
+      {report.totalBills === 0 ? null : report.totalBills < 8 ? (
+        <View style={styles.card}>
+          <View style={styles.fairnessHeaderRow}>
+            <Text style={styles.fairnessTitle}>YOUR SHARE PATTERN</Text>
+          </View>
+          <View style={styles.fairnessProgressBg}>
+            <View style={[styles.fairnessProgressFill, { width: `${(report.totalBills / 8) * 100}%` }]} />
+          </View>
+          <Text style={styles.fairnessLockedText}>
+            {8 - report.totalBills} more bill{8 - report.totalBills !== 1 ? 's' : ''} this month to unlock your share insight
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.card}>
+          <View style={styles.fairnessHeaderRow}>
+            <Text style={styles.fairnessTitle}>YOUR SHARE PATTERN</Text>
+            <Text style={styles.fairnessPrivate}>only visible to you</Text>
+          </View>
+          <View style={styles.fairnessCompareRow}>
+            <View style={styles.fairnessCol}>
+              <Text style={styles.fairnessAmount}>{sym}{report.totalSpent.toFixed(2)}</Text>
+              <Text style={styles.fairnessColLabel}>You</Text>
+            </View>
+            <View style={styles.fairnessDivider} />
+            <View style={styles.fairnessCol}>
+              <Text style={styles.fairnessAmount}>
+                {sym}{Math.max(0, report.totalSpent - report.fairnessDelta * report.totalBills).toFixed(2)}
+              </Text>
+              <Text style={styles.fairnessColLabel}>Equal share</Text>
+            </View>
+          </View>
+          <Text style={styles.fairnessSummary}>
+            {report.fairnessLabel === 'even' &&
+              'Your share aligns with equal splitting on average.'}
+            {report.fairnessLabel === 'overpaying' &&
+              `Your share ran ${sym}${Math.abs(report.fairnessDelta).toFixed(2)} above equal on average.`}
+            {report.fairnessLabel === 'underpaying' &&
+              `Your share ran ${sym}${Math.abs(report.fairnessDelta).toFixed(2)} below equal on average.`}
+          </Text>
+          <Text style={styles.fairnessBasis}>Based on {report.totalBills} bills this month</Text>
+        </View>
+      )}
 
       {/* Settlement behaviour */}
       <View style={styles.card}>
@@ -215,7 +249,19 @@ const styles = StyleSheet.create({
   catBarBg: { height: 4, width: '100%', backgroundColor: '#f3f4f6', borderRadius: 2 },
   catBar: { height: 4, backgroundColor: '#16a34a', borderRadius: 2 },
 
-  fairnessLabel: { fontSize: 15, color: '#374151', lineHeight: 22 },
+  fairnessHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  fairnessTitle: { fontSize: 11, fontWeight: '600', color: '#9ca3af', letterSpacing: 0.8 },
+  fairnessPrivate: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic' },
+  fairnessProgressBg: { height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, marginBottom: 10 },
+  fairnessProgressFill: { height: 6, backgroundColor: '#16a34a', borderRadius: 3 },
+  fairnessLockedText: { fontSize: 14, color: '#6b7280', lineHeight: 20 },
+  fairnessCompareRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  fairnessCol: { flex: 1, alignItems: 'center' },
+  fairnessAmount: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  fairnessColLabel: { fontSize: 12, color: '#9ca3af', marginTop: 4 },
+  fairnessDivider: { width: 1, height: 36, backgroundColor: '#e5e7eb' },
+  fairnessSummary: { fontSize: 14, color: '#374151', lineHeight: 21 },
+  fairnessBasis: { fontSize: 12, color: '#9ca3af', marginTop: 6 },
 
   settlementRow: { flexDirection: 'row', gap: 24 },
   settlementStat: { alignItems: 'center' },

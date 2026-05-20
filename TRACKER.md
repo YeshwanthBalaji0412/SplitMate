@@ -2,7 +2,7 @@
 
 > **Read this first, every session.** Everything else is reference material. This file tells you where things stand, what to do next, and where to look if you need more detail.
 
-*Last updated: 2026-05-18*
+*Last updated: 2026-05-20*
 
 ---
 
@@ -50,17 +50,26 @@
 | 5 | Confidence correction UX — flagged field highlights | `apps/mobile/src/hooks/useFlaggedFields.ts` | — | 2026-05-18 |
 | 6 | SQLite query layer + monthly report screen | `apps/mobile/src/hooks/useBillRecords.ts` + `apps/mobile/app/(app)/report.tsx` | — | 2026-05-18 |
 
+### V1 MLE modules
+
+| # | Module | Location | Status |
+|---|---|---|---|
+| V1-1 | Group Financial Snapshot screen | `apps/mobile/src/hooks/useGroupStats.ts` + `apps/mobile/app/(app)/groups/[id]/group-stats.tsx` | ✅ 2026-05-20 |
+| V1-2 | Spending Personality enhancements — shareability + dashboard surface | TBD | ⏳ Next |
+| V1-3 | Fairness Tracking — 8-bill gate + private framing | `apps/mobile/app/(app)/report.tsx` | ⏳ |
+| V1-4 | Item category write-back — OCR classifier output → `line_items.category` | Blocked on SWE column | ⏳ |
+| V1-5 | OCR Confidence Improvements | `packages/ocr-parser` | ⏳ |
+
+> **Decisions made (2026-05-20):** PDF upload moved to V2 (target crowd uses screenshots and camera; good-to-have later). Anomaly detection moved to V2 — needs 15–20+ bill history baseline before alerts are signal not noise; PLAN.md V2 placement was correct.
+
 ### Next actions for Sruthi
 
-MLE work is complete for MVP scope. The only remaining items are blocked on SWE schema additions (flagged to Yeshwanth — see below). Once those land:
-
+MVP schema items (unblocked when SWE adds columns):
 - Update `useBillRecords` to use `expenses.settled_at` instead of `updated_at` proxy — one line change
 - Update `useBillRecords` to read `line_items.category` for per-item tax analytics — one field addition in the map
 - Add more real receipt fixtures to `packages/ocr-parser/src/fixtures/` as edge cases are found in testing
 
-**V1 MLE work (not yet started):**
-- Anomaly detection — flag bills where fees are unusually high relative to order value
-- Item category write-back — OCR classifier output → `line_items.category` column (needs SWE column first)
+**V1 next up:** Spending Personality enhancements (V1-2) — personality card already in `report.tsx`, needs shareability (native Share) + surface as a card on the dashboard.
 
 ---
 
@@ -126,12 +135,14 @@ Update `expense_status` trigger: set `settled_at = NOW()` when status changes to
 
 ### V1 — done when: a 6-week-old user gets a genuinely useful spending insight
 
-- PDF upload (native text + OCR fallback)
-- Monthly spending report (on-demand, local)
-- Spending personality surfaced in UI
-- Fairness tracking surfaced in UI
-- Storage management (archive eligible bills)
-- Accommodation + subscription bill types
+| Feature | Status |
+|---|---|
+| Group Financial Snapshot screen | ✅ 2026-05-20 |
+| Spending personality — shareability + dashboard surface | ⏳ Next |
+| Fairness tracking surfaced in UI (8-bill gate) | ⏳ |
+| Storage management (archive eligible bills) | ⏳ |
+| Accommodation + subscription bill types | ⏳ SWE |
+| PDF upload | Moved to V2 — target crowd uses screenshots/camera; good-to-have |
 
 ### V2 — done when: the app proactively surfaces something a user didn't know to ask for
 

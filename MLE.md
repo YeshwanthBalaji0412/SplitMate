@@ -158,11 +158,32 @@ Key mapping decisions:
 
 ---
 
+### V1 Module 1 — Group Financial Snapshot ✓
+**Branch:** `v1-group-snapshot`
+**Depends on:** analytics package (✓), Supabase sync (✓)
+
+**Built:**
+
+`useGroupStats(groupId, userId, window)` — queries all expenses in a group for the current month window. Joins `expense_participants` and `line_items` in a single Supabase call. Computes group-level metrics: total group spend, user's share, average share per participant, settlement streak, and top spending category. Returns `GroupSnapshot`.
+
+Key design decisions:
+- Queries ALL group expenses (not just user's) so group total is accurate even for bills the user didn't participate in
+- Participant count derived from unique `user_id` entries across all bill `expense_participants` — not from group membership list (matches what was actually billed)
+- Uses same `computeSettlementStreak` from analytics package — consistent with personal report
+- `settledAt` uses same `updated_at` approximation as `useBillRecords` — will be fixed when SWE adds `settled_at` column
+
+`group-stats.tsx` — new screen at `groups/[id]/group-stats`. Four metric cards: total group spend, your share vs group average (with delta indicator — green if under, red if over), settlement streak with hint if zero, biggest category with % of group spend. Empty state for months with no bills.
+
+`groups/[id]/index.tsx` — "Group Stats" outlined button added below the primary action row (Add Bill + Settle Up). Styled as secondary to keep primary actions prominent.
+
+---
+
 ## Open Questions
 
-- [ ] Minimum bill history before Layer 2 insights are shown — currently 5 bills for personality, need to decide for fairness delta and settlement streak
+- [x] PDF upload approach — moved to V2. Target crowd uses screenshots and camera; adding PDF now is scope creep.
+- [x] Anomaly detection — V2, not V1. Needs 15–20+ bill history baseline to be signal not noise. PLAN.md V2 placement was correct; TRACKER.md V1 entry was wrong.
+- [ ] Minimum bill history before fairness delta is shown in UI — need to decide the gate (currently considering 8 bills, same as PLAN.md)
 - [ ] How to handle flat-total bills (no itemization) in the classifier — currently falls through to manual assignment
-- [ ] PDF parsing (V1): native text extraction first, ML Kit OCR fallback for scanned PDFs
 
 ---
 
@@ -177,4 +198,5 @@ Key mapping decisions:
 | 2026-05-18 | — | All MLE branches merged to main. ML Kit integration is next. |
 | 2026-05-18 | ML Kit integration | `useOcrScanner` + `useReceiptAsset` + bill-entry pre-fill complete. Merged to main. |
 | 2026-05-18 | Confidence correction UX | `useFlaggedFields` + amber highlight treatment + date field + live badge countdown. Merged to main. |
-| 2026-05-18 | SQLite query layer | `useBillRecords` + `report.tsx` complete. On `sqlite-query-layer` branch. |
+| 2026-05-18 | SQLite query layer | `useBillRecords` + `report.tsx` complete. Merged to main. |
+| 2026-05-20 | V1-1: Group Financial Snapshot | `useGroupStats` + `group-stats.tsx` + Group Stats button in group index. On `v1-group-snapshot` branch. |

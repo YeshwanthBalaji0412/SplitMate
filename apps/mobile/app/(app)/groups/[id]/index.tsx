@@ -94,6 +94,12 @@ export default function GroupDetailScreen() {
             <Text style={[styles.actionText, styles.settleText]}>Settle Up</Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity
+          style={styles.statsBtn}
+          onPress={() => router.push(`/(app)/groups/${id}/group-stats`)}
+        >
+          <Text style={styles.statsText}>Group Stats</Text>
+        </TouchableOpacity>
       </View>
 
       {expenses.length === 0 ? (
@@ -156,4 +162,13 @@ const styles = StyleSheet.create({
   expenseAmount: { fontSize: 15, fontWeight: '700', color: '#111827' },
   status: { fontSize: 11, color: '#f59e0b', fontWeight: '600', marginTop: 3, textTransform: 'uppercase' },
   statusSettled: { color: '#16a34a' },
+  statsBtn: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  statsText: { fontSize: 14, fontWeight: '500', color: '#374151' },
 });

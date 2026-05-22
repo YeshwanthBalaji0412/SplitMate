@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "SplitMate",
+    "slug": "splitmate",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "scheme": "splitmate",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.splitmate.app"
+    },
+    "android": {
+      "package": "com.splitmate.app"
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

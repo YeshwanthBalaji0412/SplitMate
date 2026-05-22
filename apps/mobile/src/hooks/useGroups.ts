@@ -205,38 +205,20 @@ export type CreateGroupResult = { ok: true; group: Group } | { ok: false; error:
  *  - group_members_insert_self: user_id = auth.uid()
  */
 export async function createGroup(input: CreateGroupInput): Promise<CreateGroupResult> {
-  const { data: sessionData } = await supabase.auth.getUser();
-  const userId = sessionData.user?.id;
-  if (!userId) return { ok: false, error: 'Not signed in.' };
-
-  const { data: groupRow, error: gErr } = await supabase
-    .from('groups')
-    .insert({
-      name: input.name,
-      type: input.type,
-      currency: input.currency,
-      country: input.country,
-      settlement_mode: input.settlementMode,
-      created_by: userId,
-    })
-    .select('*')
-    .single();
-
-  if (gErr || !groupRow) {
-    return { ok: false, error: gErr?.message ?? 'Failed to create group.' };
-  }
-
-  const { error: mErr } = await supabase.from('group_members').insert({
-    group_id: groupRow.id,
-    user_id: userId,
-    role: 'owner',
+  // Atomic group + membership creation via SECURITY DEFINER RPC (migration 005).
+  // The RPC inserts both rows in one transaction; we get back the new group row
+  // after the creator is already a member, so the existing SELECT policy works
+  // for every read that follows.
+  const { data, error } = await supabase.rpc('create_group_with_owner', {
+    p_name: input.name,
+    p_type: input.type,
+    p_currency: input.currency,
+    p_country: input.country,
+    p_settlement_mode: input.settlementMode,
   });
 
-  if (mErr) {
-    // The group exists but the creator isn't a member. Surface the error;
-    // the user can retry the membership insert from the join screen if needed.
-    return { ok: false, error: `Group created but membership failed: ${mErr.message}` };
+  if (error || !data) {
+    return { ok: false, error: error?.message ?? 'Failed to create group.' };
   }
-
-  return { ok: true, group: rowToGroup(groupRow) };
+  return { ok: true, group: rowToGroup(data as Record<string, unknown>) };
 }

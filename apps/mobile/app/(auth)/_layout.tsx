@@ -1,20 +1,23 @@
-import { Redirect } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Redirect, Stack } from 'expo-router';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function Index() {
+export default function AuthLayout() {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
       <View style={styles.container}>
         <ActivityIndicator />
-        <Text style={styles.text}>SplitMate loading...</Text>
       </View>
     );
   }
 
-  return <Redirect href={isAuthenticated ? '/(app)/dashboard' : '/(auth)/login'} />;
+  if (isAuthenticated) {
+    return <Redirect href="/(app)/dashboard" />;
+  }
+
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
 
 const styles = StyleSheet.create({
@@ -23,10 +26,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffff',
-    gap: 12,
-  },
-  text: {
-    fontSize: 18,
-    color: '#111111',
   },
 });

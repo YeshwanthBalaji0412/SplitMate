@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
+    "@opentelemetry/api": "^1.9.0",
     "@splitmate/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.12",
     "expo": "~52.0.27",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~18.3.12",
+    "react-refresh": "~0.14.2",
     "typescript": "^5.7.3"
   }
 }

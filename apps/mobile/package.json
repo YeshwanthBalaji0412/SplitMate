@@ -13,6 +13,8 @@
   "dependencies": {
     "@expo/metro-runtime": "~4.0.1",
     "@opentelemetry/api": "^1.9.0",
+    "@react-native-ml-kit/text-recognition": "^2.0.0",
+    "@splitmate/ocr-parser": "workspace:*",
     "@splitmate/split-engine": "workspace:*",
     "@splitmate/types": "workspace:*",
     "@supabase/supabase-js": "^2.47.12",
@@ -20,6 +22,8 @@
     "expo-constants": "~17.0.5",
     "expo-linking": "~7.0.4",
     "expo-router": "~4.0.17",
+    "expo-file-system": "~18.0.7",
+    "expo-image-picker": "~16.0.6",
     "expo-secure-store": "~14.0.1",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",

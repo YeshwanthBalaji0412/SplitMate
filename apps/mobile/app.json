@@ -9,12 +9,31 @@
     "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.splitmate.app"
+      "bundleIdentifier": "com.splitmate.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SplitMate uses the camera to scan receipts.",
+        "NSPhotoLibraryUsageDescription": "SplitMate accesses your photos to scan receipts."
+      }
     },
     "android": {
-      "package": "com.splitmate.app"
+      "package": "com.splitmate.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
+      ]
     },
-    "plugins": ["expo-router", "expo-secure-store"],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SplitMate accesses your photos to scan receipts.",
+          "cameraPermission": "SplitMate uses the camera to scan receipts."
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": true
     }

@@ -150,7 +150,9 @@ export default function GroupHomeScreen() {
           <View style={styles.secondaryRow}>
             <Pressable
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-              onPress={() => comingSoon('Settlement', 'Phase 10')}
+              onPress={() =>
+                router.push({ pathname: '/(app)/groups/[id]/settle', params: { id: groupId } })
+              }
             >
               <Text style={styles.secondaryBtnText}>Settle Up</Text>
             </Pressable>

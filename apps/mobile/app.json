@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.splitmate.app",
+      "deploymentTarget": "16.0",
       "infoPlist": {
         "NSCameraUsageDescription": "SplitMate uses the camera to scan receipts.",
         "NSPhotoLibraryUsageDescription": "SplitMate accesses your photos to scan receipts."

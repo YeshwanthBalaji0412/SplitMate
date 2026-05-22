@@ -1,4 +1,5 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -9,7 +10,10 @@ import {
   Text,
   View,
 } from 'react-native';
+import type { Expense } from '@splitmate/types';
+import { formatAmount } from '@splitmate/split-engine';
 import { formatInviteCodeForDisplay } from '@/lib/inviteCode';
+import { useBillsInGroup } from '@/hooks/useBills';
 import { useGroup, useGroupMembers, type GroupMemberWithProfile } from '@/hooks/useGroups';
 
 function comingSoon(feature: string, phase: string) {
@@ -27,6 +31,14 @@ export default function GroupHomeScreen() {
 
   const { group, loading: gLoading, error: gError } = useGroup(groupId);
   const { members, loading: mLoading } = useGroupMembers(groupId);
+  const { bills, refresh: refreshBills } = useBillsInGroup(groupId);
+
+  // Refresh the bills list whenever the screen regains focus (after creating a new one).
+  useFocusEffect(
+    useCallback(() => {
+      refreshBills();
+    }, [refreshBills]),
+  );
 
   const loading = gLoading || mLoading;
 
@@ -99,36 +111,51 @@ export default function GroupHomeScreen() {
 
         {/* Bills */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Bills</Text>
-          <Text style={styles.sectionSubtitle}>No bills yet. Add one to start splitting.</Text>
+          <Text style={styles.sectionTitle}>Bills ({bills.length})</Text>
+          {bills.length === 0 ? (
+            <Text style={styles.sectionSubtitle}>No bills yet. Add one to start splitting.</Text>
+          ) : (
+            <View style={styles.billList}>
+              {bills.map((b) => (
+                <BillRow
+                  key={b.id}
+                  bill={b}
+                  currency={group.currency}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/groups/[id]/bill/[billId]',
+                      params: { id: groupId, billId: b.id },
+                    })
+                  }
+                />
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Action buttons */}
+        {/* Actions */}
         <View style={styles.actionStack}>
           <Pressable
             style={({ pressed }) => [styles.primaryBtn, pressed && styles.primaryBtnPressed]}
-            onPress={() => comingSoon('Bill entry', 'Phase 9')}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/groups/[id]/bill-entry',
+                params: { id: groupId },
+              })
+            }
           >
             <Text style={styles.primaryBtnText}>Add Bill</Text>
           </Pressable>
 
           <View style={styles.secondaryRow}>
             <Pressable
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                pressed && styles.secondaryBtnPressed,
-                styles.secondaryBtnLeft,
-              ]}
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
               onPress={() => comingSoon('Settlement', 'Phase 10')}
             >
               <Text style={styles.secondaryBtnText}>Settle Up</Text>
             </Pressable>
             <Pressable
-              style={({ pressed }) => [
-                styles.secondaryBtn,
-                pressed && styles.secondaryBtnPressed,
-                styles.secondaryBtnRight,
-              ]}
+              style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
               onPress={() => comingSoon('Group analytics', 'Phase 14')}
             >
               <Text style={styles.secondaryBtnText}>Group Stats</Text>
@@ -161,6 +188,32 @@ function MemberRow({ member }: { member: GroupMemberWithProfile }) {
         {member.role === 'owner' ? <Text style={styles.memberRole}>owner</Text> : null}
       </View>
     </View>
+  );
+}
+
+function BillRow({
+  bill,
+  currency,
+  onPress,
+}: {
+  bill: Expense;
+  currency: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.billRow, pressed && styles.billRowPressed]}
+      onPress={onPress}
+    >
+      <View style={{ flex: 1 }}>
+        <Text style={styles.billTitle}>{bill.title}</Text>
+        <Text style={styles.billMeta}>
+          {bill.date} · {bill.billType}
+          {bill.status === 'settled' ? ' · settled' : ''}
+        </Text>
+      </View>
+      <Text style={styles.billAmount}>{formatAmount(bill.totalAmount, currency)}</Text>
+    </Pressable>
   );
 }
 
@@ -242,6 +295,19 @@ const styles = StyleSheet.create({
   memberName: { fontSize: 15, color: '#111111', fontWeight: '500' },
   memberRole: { fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 },
 
+  billList: { gap: 8, marginTop: 6 },
+  billRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+  },
+  billRowPressed: { backgroundColor: '#f3f4f6' },
+  billTitle: { fontSize: 15, fontWeight: '500', color: '#111111' },
+  billMeta: { fontSize: 12, color: '#6b7280', marginTop: 2, textTransform: 'capitalize' },
+  billAmount: { fontSize: 15, fontWeight: '600', color: '#111111', fontVariant: ['tabular-nums'] },
+
   actionStack: { gap: 10, marginTop: 4 },
   primaryBtn: {
     backgroundColor: '#16a34a',
@@ -263,6 +329,4 @@ const styles = StyleSheet.create({
   },
   secondaryBtnPressed: { backgroundColor: '#f3f4f6' },
   secondaryBtnText: { color: '#111111', fontSize: 14, fontWeight: '500' },
-  secondaryBtnLeft: {},
-  secondaryBtnRight: {},
 });

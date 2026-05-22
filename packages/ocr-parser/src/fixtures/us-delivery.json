@@ -1,0 +1,16 @@
+[
+  { "text": "DoorDash", "position": 0 },
+  { "text": "Order #DD-9827361", "position": 1 },
+  { "text": "May 18, 2026", "position": 2 },
+  { "text": "Chicken Tikka Masala $16.99", "position": 3 },
+  { "text": "Naan Bread $3.49", "position": 4 },
+  { "text": "Mango Lassi $4.99", "position": 5 },
+  { "text": "Subtotal $25.47", "position": 6 },
+  { "text": "Delivery Fee $3.99", "position": 7 },
+  { "text": "Service Fee $2.54", "position": 8 },
+  { "text": "Sales Tax $2.10", "position": 9 },
+  { "text": "Tip $5.00", "position": 10 },
+  { "text": "Discount -$3.00", "position": 11 },
+  { "text": "Total $36.10", "position": 12 },
+  { "text": "Paid with Apple Pay", "position": 13 }
+]

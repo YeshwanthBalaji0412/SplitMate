@@ -1,0 +1,17 @@
+[
+  { "text": "Zomato", "position": 0 },
+  { "text": "Order ID: ZMT-8837261", "position": 1 },
+  { "text": "22/05/2026", "position": 2 },
+  { "text": "Paneer Butter Masala ₹289", "position": 3 },
+  { "text": "2x Garlic Naan ₹118", "position": 4 },
+  { "text": "Gulab Jamun ₹99", "position": 5 },
+  { "text": "Subtotal ₹506", "position": 6 },
+  { "text": "Delivery Fee ₹40", "position": 7 },
+  { "text": "Packaging Charges ₹30", "position": 8 },
+  { "text": "Platform Fee ₹7", "position": 9 },
+  { "text": "GST ₹25.30", "position": 10 },
+  { "text": "Coupon Discount -₹100", "position": 11 },
+  { "text": "Grand Total ₹508.30", "position": 12 },
+  { "text": "Paid via UPI", "position": 13 },
+  { "text": "www.zomato.com", "position": 14 }
+]

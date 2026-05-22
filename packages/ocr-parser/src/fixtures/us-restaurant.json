@@ -1,0 +1,17 @@
+[
+  { "text": "THE GOLDEN OAK", "position": 0 },
+  { "text": "123 Main St, Austin TX", "position": 1 },
+  { "text": "03/15/2026", "position": 2 },
+  { "text": "------", "position": 3 },
+  { "text": "Grilled Salmon $24.00", "position": 4 },
+  { "text": "Caesar Salad $14.50", "position": 5 },
+  { "text": "2x Garlic Bread $9.00", "position": 6 },
+  { "text": "IPA Draft Beer $8.00", "position": 7 },
+  { "text": "Sparkling Water $3.50", "position": 8 },
+  { "text": "------", "position": 9 },
+  { "text": "Subtotal $59.00", "position": 10 },
+  { "text": "Sales Tax $4.87", "position": 11 },
+  { "text": "Tip $11.00", "position": 12 },
+  { "text": "Total $74.87", "position": 13 },
+  { "text": "Thank you for dining with us!", "position": 14 }
+]

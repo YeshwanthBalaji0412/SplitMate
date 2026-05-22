@@ -1,0 +1,19 @@
+[
+  { "text": "PUNJAB GRILL", "position": 0 },
+  { "text": "Connaught Place, New Delhi", "position": 1 },
+  { "text": "GSTIN: 07AABCU9603R1ZM", "position": 2 },
+  { "text": "FSSAI: 13321001000456", "position": 3 },
+  { "text": "15/03/2026", "position": 4 },
+  { "text": "Table No: 12", "position": 5 },
+  { "text": "Dal Makhani ₹420", "position": 6 },
+  { "text": "Butter Chicken ₹520", "position": 7 },
+  { "text": "2x Butter Naan ₹160", "position": 8 },
+  { "text": "Kingfisher Beer ₹350", "position": 9 },
+  { "text": "Masala Chai ₹80", "position": 10 },
+  { "text": "Subtotal ₹1530", "position": 11 },
+  { "text": "CGST @ 2.5% ₹38.25", "position": 12 },
+  { "text": "SGST @ 2.5% ₹38.25", "position": 13 },
+  { "text": "Service Charge 10% ₹153", "position": 14 },
+  { "text": "Grand Total ₹1759.50", "position": 15 },
+  { "text": "Thank you! Visit again!", "position": 16 }
+]

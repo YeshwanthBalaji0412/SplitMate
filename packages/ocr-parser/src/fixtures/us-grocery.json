@@ -1,0 +1,16 @@
+[
+  { "text": "WHOLE FOODS MARKET", "position": 0 },
+  { "text": "1525 Pearl St, Boulder CO", "position": 1 },
+  { "text": "05/20/2026", "position": 2 },
+  { "text": "Organic Bananas $1.99", "position": 3 },
+  { "text": "Whole Milk $4.49", "position": 4 },
+  { "text": "Sourdough Bread $5.99", "position": 5 },
+  { "text": "Avocados 3pk $4.99", "position": 6 },
+  { "text": "Chardonnay 750ml $12.99", "position": 7 },
+  { "text": "Free Range Eggs $6.49", "position": 8 },
+  { "text": "Bottled Water 24pk $5.99", "position": 9 },
+  { "text": "Subtotal $42.93", "position": 10 },
+  { "text": "Sales Tax $2.16", "position": 11 },
+  { "text": "Total $45.09", "position": 12 },
+  { "text": "VISA ****1234", "position": 13 }
+]

@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { supabase } from '@/lib/supabase';
-import { formatAmount } from '@split-smart/split-engine';
+import { computeSplit, formatAmount } from '@split-smart/split-engine';
+import type { Expense, LineItem, LineItemParticipant, ChargeComponent, ExpenseParticipant, SplitRule } from '@split-smart/types';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
@@ -164,6 +165,82 @@ export default function AssignItemsScreen() {
 
     if (newParticipants.length > 0) {
       await supabase.from('expense_participants').insert(newParticipants);
+    }
+
+    // Run the split engine and write owed_amount back to DB
+    try {
+      const { data: expRow, error: expErr } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
+      if (expErr || !expRow) {
+        throw new Error(expErr?.message ?? 'Failed to retrieve expense row');
+      }
+
+      const { data: chargeRows, error: chargeErr } = await supabase.from('charge_components').select('*').eq('expense_id', expenseId);
+      if (chargeErr) {
+        throw new Error(chargeErr.message);
+      }
+
+      const { data: partRows, error: partErr } = await supabase.from('expense_participants').select('*').eq('expense_id', expenseId);
+      if (partErr || !partRows || partRows.length === 0) {
+        throw new Error(partErr?.message ?? 'No participants found for this expense');
+      }
+
+      const mappedExpense: Expense = {
+        id: expRow.id, groupId: expRow.group_id, title: expRow.title,
+        description: expRow.description, totalAmount: parseFloat(expRow.total_amount),
+        currency: expRow.currency, category: expRow.category, billType: expRow.bill_type,
+        paidBy: expRow.paid_by, date: expRow.date, receiptAssetId: expRow.receipt_asset_id,
+        status: expRow.status, splitMethod: expRow.split_method,
+        createdBy: expRow.created_by, createdAt: expRow.created_at, updatedAt: expRow.updated_at,
+      };
+
+      const mappedItems: LineItem[] = items.map((i) => ({
+        id: i.id, expenseId: expenseId!, name: i.name,
+        quantity: i.quantity, unitPrice: i.unit_price,
+        totalPrice: i.total_price, position: i.position,
+      }));
+
+      const mappedLips: LineItemParticipant[] = rows.map((r, idx) => ({
+        id: `lip-${idx}`, lineItemId: r.line_item_id, userId: r.user_id, shares: r.shares,
+      }));
+
+      const mappedCharges: ChargeComponent[] = (chargeRows ?? []).map((c: any) => ({
+        id: c.id, expenseId: c.expense_id, type: c.type, label: c.label,
+        amount: parseFloat(c.amount), rate: c.rate ? parseFloat(c.rate) : undefined,
+        allocationRule: c.allocation_rule, excludedUserIds: c.excluded_user_ids ?? [],
+        position: c.position,
+      }));
+
+      const mappedParticipants: ExpenseParticipant[] = partRows.map((p: any) => ({
+        id: p.id, expenseId: p.expense_id, userId: p.user_id,
+        owedAmount: 0, paidAmount: parseFloat(p.paid_amount), isIncluded: p.is_included,
+      }));
+
+      const splitRule: SplitRule = {
+        id: 'default', expenseId: expenseId!, method: 'itemized', overrides: {},
+      };
+
+      const result = computeSplit({
+        expense: mappedExpense, lineItems: mappedItems,
+        lineItemParticipants: mappedLips, chargeComponents: mappedCharges,
+        splitRule, participants: mappedParticipants,
+      });
+
+      // Write computed owed_amount back to each participant, throwing on any error to prevent placeholders/stale data
+      const updatePromises = result.breakdown.map(async (b) => {
+        const { error: updateErr } = await supabase
+          .from('expense_participants')
+          .update({ owed_amount: Math.round(b.totalOwed * 100) / 100 })
+          .eq('expense_id', expenseId)
+          .eq('user_id', b.userId);
+        if (updateErr) {
+          throw new Error(`Failed to update participant ${b.userId}: ${updateErr.message}`);
+        }
+      });
+      await Promise.all(updatePromises);
+    } catch (e: any) {
+      Alert.alert('Calculation Error', e.message ?? 'An unexpected error occurred during split calculation.');
+      setLoading(false);
+      return;
     }
 
     setLoading(false);

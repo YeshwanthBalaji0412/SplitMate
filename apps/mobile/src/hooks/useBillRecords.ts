@@ -49,10 +49,10 @@ export function useBillRecords() {
     const { data: expenses, error: eErr } = await supabase
       .from('expenses')
       .select(`
-        id, group_id, date, bill_type, total_amount, currency, status, updated_at,
+        id, group_id, date, bill_type, total_amount, currency, status, updated_at, settled_at,
         expense_participants ( user_id, owed_amount, paid_amount ),
         line_items (
-          id, name, total_price,
+          id, name, total_price, category,
           line_item_participants ( user_id )
         )
       `)
@@ -70,12 +70,12 @@ export function useBillRecords() {
       billType: toBillCategory(exp.bill_type),
       totalAmount: parseFloat(exp.total_amount),
       currency: exp.currency,
-      // settledAt: use updated_at when status=settled.
-      // Approximation — accurate enough for streak/archive calculations.
-      // TODO: replace with a dedicated settled_at column on expenses (SWE task).
-      settledAt: exp.status === 'settled'
-        ? (exp.updated_at as string).slice(0, 10)
-        : null,
+      // Map settledAt from settled_at, fallback to updated_at only if settled_at is null and status is settled.
+      settledAt: exp.settled_at
+        ? (exp.settled_at as string).slice(0, 10)
+        : exp.status === 'settled'
+          ? (exp.updated_at as string).slice(0, 10)
+          : null,
       participants: (exp.expense_participants ?? []).map((p: any) => ({
         userId: p.user_id,
         owedAmount: parseFloat(p.owed_amount),
@@ -84,9 +84,8 @@ export function useBillRecords() {
       items: (exp.line_items ?? []).map((item: any) => ({
         name: item.name,
         totalPrice: parseFloat(item.total_price),
-        // Item category not stored in DB yet — defaults to 'other'.
-        // Will be populated once OCR item classification writes to line_items.
-        category: 'other' as ItemCategory,
+        // Map item category safely with a fallback to 'other'.
+        category: (item.category as ItemCategory) ?? 'other',
         claimedByUserIds: (item.line_item_participants ?? []).map(
           (lip: any) => lip.user_id as string
         ),

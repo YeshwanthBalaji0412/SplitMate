@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import type { ParsedBillDraft } from '@split-smart/ocr-parser';
 
@@ -12,21 +13,51 @@ import type { ParsedBillDraft } from '@split-smart/ocr-parser';
 export function useReceiptAsset() {
   const createAsset = useCallback(
     async (expenseId: string, imageUri: string, uploadedBy: string): Promise<string | null> => {
-      const { data, error } = await supabase
-        .from('receipt_assets')
-        .insert({
-          expense_id: expenseId,
-          storage_path: imageUri, // local URI at this stage — SWE upload flow TBD
-          mime_type: 'image/jpeg',
-          size_bytes: 0,          // unknown until upload
-          parse_status: 'processing',
-          uploaded_by: uploadedBy,
-        })
-        .select('id')
-        .single();
+      try {
+        // Fetch local image URI and convert to a binary blob for upload
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const sizeBytes = blob.size;
 
-      if (error || !data) return null;
-      return data.id;
+        const filename = `${expenseId}-${Date.now()}.jpg`;
+
+        // Upload the actual receipt image to Supabase Storage bucket 'receipts'
+        // NOTE: For demo, a public bucket is acceptable.
+        // PRODUCTION NOTE: In a production environment, we should use private storage
+        // with restricted access policies and generate short-lived signed URLs for security.
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('receipts')
+          .upload(filename, blob, {
+            contentType: 'image/jpeg',
+            upsert: true,
+          });
+
+        if (uploadError || !uploadData) {
+          throw new Error(uploadError?.message ?? 'Failed to upload image to Supabase storage.');
+        }
+
+        const { data, error } = await supabase
+          .from('receipt_assets')
+          .insert({
+            expense_id: expenseId,
+            storage_path: uploadData.path, // store the real Supabase storage path
+            mime_type: 'image/jpeg',
+            size_bytes: sizeBytes,
+            parse_status: 'processing',
+            uploaded_by: uploadedBy,
+          })
+          .select('id')
+          .single();
+
+        if (error || !data) {
+          throw new Error(error?.message ?? 'Failed to insert receipt asset record.');
+        }
+
+        return data.id;
+      } catch (err: any) {
+        Alert.alert('Receipt Upload Failed', err?.message ?? 'An error occurred during receipt upload.');
+        return null;
+      }
     },
     []
   );

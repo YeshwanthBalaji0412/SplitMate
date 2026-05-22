@@ -29,6 +29,7 @@ interface LineItemInput {
   name: string;
   quantity: string;
   unitPrice: string;
+  category: string;
 }
 
 interface ChargeInput {
@@ -58,7 +59,7 @@ export default function BillEntryScreen() {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [billType, setBillType] = useState<BillType>('restaurant');
-  const [items, setItems] = useState<LineItemInput[]>([{ name: '', quantity: '1', unitPrice: '' }]);
+  const [items, setItems] = useState<LineItemInput[]>([{ name: '', quantity: '1', unitPrice: '', category: 'other' }]);
   const [charges, setCharges] = useState<ChargeInput[]>([]);
   const [currency, setCurrency] = useState('USD');
   const [country, setCountry] = useState<Country>('US');
@@ -92,10 +93,11 @@ export default function BillEntryScreen() {
     if (draft.billType) setBillType(toExpenseBillType(draft.billType));
 
     if (draft.items.length > 0) {
-      setItems(draft.items.map((item: { name: string; quantity: number; unitPrice: number }) => ({
+      setItems(draft.items.map((item: { name: string; quantity: number; unitPrice: number; category?: string }) => ({
         name: item.name,
         quantity: String(item.quantity),
         unitPrice: String(item.unitPrice),
+        category: item.category ?? 'other',
       })));
     }
 
@@ -125,7 +127,7 @@ export default function BillEntryScreen() {
     }
   }, [scanState, resetScan]);
 
-  const addItem = () => setItems([...items, { name: '', quantity: '1', unitPrice: '' }]);
+  const addItem = () => setItems([...items, { name: '', quantity: '1', unitPrice: '', category: 'other' }]);
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
   const updateItem = (i: number, field: keyof LineItemInput, value: string) => {
     const updated = [...items];
@@ -203,6 +205,7 @@ export default function BillEntryScreen() {
         unit_price: parseFloat(item.unitPrice),
         total_price: (parseFloat(item.quantity) || 1) * parseFloat(item.unitPrice),
         position: i,
+        category: item.category ?? 'other',
       }))
     );
 

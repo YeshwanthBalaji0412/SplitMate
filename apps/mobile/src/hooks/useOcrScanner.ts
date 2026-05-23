@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
-import type { BillType, Country, ParsedBillDraft, RawLine } from '@splitmate/types';
+import type { BillType, Country, ParsedBillDraft } from '@splitmate/types';
 import { parseReceipt } from '@splitmate/ocr-parser';
+import { recognizeText } from '@/lib/ocrProcess';
 
 /**
  * Five-state machine for receipt OCR scanning.
@@ -11,14 +11,15 @@ import { parseReceipt } from '@splitmate/ocr-parser';
  *   idle → picking → processing → done | failed
  *
  * Two entry points:
- *   pickFromGallery() — open photo library, pick a saved receipt image
- *   captureFromCamera() — launch camera to photograph a physical receipt
+ *   pickFromGallery()    — open photo library to pick a saved receipt image
+ *   captureFromCamera()  — launch camera to photograph a physical receipt
  *
- * Both paths feed the image URI into ML Kit → parser → ParsedBillDraft.
+ * Platform-aware OCR:
+ *   - Native (iOS/Android): ML Kit on-device via ocrProcess.ts
+ *   - Web: Tesseract.js (WebAssembly) via ocrProcess.web.ts
+ *   Metro resolves the right file automatically via the .web.ts extension.
  *
- * Web guard:
- *   ML Kit is native-only. On web both methods immediately return 'failed'
- *   with a clear message. The web bundle never crashes.
+ * Both paths feed recognized text into the same parseReceipt() pipeline.
  */
 
 export type OcrScanState =
@@ -32,30 +33,15 @@ export function useOcrScanner(country: Country, billType: BillType) {
   const [state, setState] = useState<OcrScanState>({ status: 'idle' });
 
   /**
-   * Shared OCR pipeline: takes an image URI, runs ML Kit + parser.
-   * Called by both gallery and camera paths after an image is obtained.
+   * Shared OCR pipeline: takes an image URI, runs platform-specific
+   * text recognition, then feeds the raw lines into the parser.
    */
   const processImage = useCallback(
     async (imageUri: string) => {
       setState({ status: 'processing' });
 
       try {
-        const mlkitResult = await TextRecognition.recognize(imageUri);
-
-        const rawLines: RawLine[] = mlkitResult.blocks
-          .flatMap((block) => block.lines)
-          .map((line, position) => ({
-            text: line.text,
-            position,
-            boundingBox: line.frame
-              ? {
-                  x: line.frame.left,
-                  y: line.frame.top,
-                  width: line.frame.width,
-                  height: line.frame.height,
-                }
-              : undefined,
-          }));
+        const rawLines = await recognizeText(imageUri);
 
         if (rawLines.length === 0) {
           setState({ status: 'failed', reason: 'No text detected in image.' });
@@ -76,24 +62,19 @@ export function useOcrScanner(country: Country, billType: BillType) {
 
   /**
    * Pick a receipt image from the photo library.
-   * Best for: saved screenshots, emailed receipts, downloaded images.
+   * Works on all platforms (web uses <input type="file"> under the hood).
    */
   const pickFromGallery = useCallback(async () => {
-    if (Platform.OS === 'web') {
-      setState({
-        status: 'failed',
-        reason: 'OCR is unavailable on web. Please use iOS or Android.',
-      });
-      return;
-    }
-
     setState({ status: 'picking' });
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setState({ status: 'failed', reason: 'Photo library permission denied.' });
-        return;
+      // On web, expo-image-picker uses <input type="file"> — no permission needed.
+      if (Platform.OS !== 'web') {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setState({ status: 'failed', reason: 'Photo library permission denied.' });
+          return;
+        }
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -118,13 +99,13 @@ export function useOcrScanner(country: Country, billType: BillType) {
 
   /**
    * Capture a receipt photo using the device camera.
-   * Best for: photographing a physical paper receipt at a restaurant.
+   * Not available on web — shows a clear message.
    */
   const captureFromCamera = useCallback(async () => {
     if (Platform.OS === 'web') {
       setState({
         status: 'failed',
-        reason: 'Camera capture is unavailable on web. Please use iOS or Android.',
+        reason: 'Camera capture is not available in the browser. Use "Upload receipt" to pick an image file instead.',
       });
       return;
     }
@@ -158,10 +139,7 @@ export function useOcrScanner(country: Country, billType: BillType) {
     }
   }, [processImage]);
 
-  // Legacy alias: `scan` maps to gallery pick for backward compatibility
-  // with bill-entry.tsx which calls `scan()`.
   const scan = pickFromGallery;
-
   const reset = useCallback(() => setState({ status: 'idle' }), []);
 
   return { state, scan, pickFromGallery, captureFromCamera, reset };

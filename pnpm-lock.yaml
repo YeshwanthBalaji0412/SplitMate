@@ -29,6 +29,9 @@ importers:
       '@react-native-ml-kit/text-recognition':
         specifier: ^2.0.0
         version: 2.0.0(react-native@0.76.6(@babel/core@7.29.0)(@babel/preset-env@7.29.5(@babel/core@7.29.0))(@types/react@18.3.29)(react@18.3.1))(react@18.3.1)
+      '@splitmate/analytics':
+        specifier: workspace:*
+        version: link:../../packages/analytics
       '@splitmate/ocr-parser':
         specifier: workspace:*
         version: link:../../packages/ocr-parser
@@ -93,6 +96,19 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.9.3
+
+  packages/analytics:
+    dependencies:
+      '@splitmate/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@25.9.1)(lightningcss@1.27.0)(terser@5.48.0)
 
   packages/ocr-parser:
     dependencies:

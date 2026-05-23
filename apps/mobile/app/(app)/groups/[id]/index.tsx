@@ -158,7 +158,9 @@ export default function GroupHomeScreen() {
             </Pressable>
             <Pressable
               style={({ pressed }) => [styles.secondaryBtn, pressed && styles.secondaryBtnPressed]}
-              onPress={() => comingSoon('Group analytics', 'Phase 14')}
+              onPress={() =>
+                router.push({ pathname: '/(app)/groups/[id]/group-stats', params: { id: groupId } })
+              }
             >
               <Text style={styles.secondaryBtnText}>Group Stats</Text>
             </Pressable>

@@ -75,6 +75,14 @@ export default function Dashboard() {
         </Pressable>
       </View>
 
+      {/* My Report link */}
+      <Pressable
+        style={({ pressed }) => [styles.reportBtn, pressed && styles.reportBtnPressed]}
+        onPress={() => router.push('/(app)/report')}
+      >
+        <Text style={styles.reportBtnText}>📊 My Report</Text>
+      </Pressable>
+
       {/* List */}
       {loading && groups.length === 0 ? (
         <View style={styles.centered}>
@@ -190,4 +198,16 @@ const styles = StyleSheet.create({
   groupMeta: { fontSize: 13, color: '#6b7280', marginTop: 2, textTransform: 'capitalize' },
   chevron: { fontSize: 24, color: '#9ca3af' },
   separator: { height: 10 },
+
+  reportBtn: {
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    marginBottom: 12,
+  },
+  reportBtnPressed: { backgroundColor: '#f3f4f6' },
+  reportBtnText: { color: '#111111', fontSize: 14, fontWeight: '500' },
 });

@@ -96,7 +96,7 @@ export default function BillEntryScreen() {
 
   // ---- OCR scanning state ---------------------------------------------------
   const country = (group?.country ?? 'US') as Country;
-  const { state: scanState, scan, reset: resetScan } = useOcrScanner(country, billType);
+  const { state: scanState, pickFromGallery, captureFromCamera, reset: resetScan } = useOcrScanner(country, billType);
   const { isFlagged, confirm, remaining, reset: resetFlags, flaggedSet } = useFlaggedFields();
   const [scanImageUri, setScanImageUri] = useState<string | null>(null);
 
@@ -280,21 +280,31 @@ export default function BillEntryScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* ---- Scan button + badge ---- */}
+          {/* ---- OCR buttons + badge ---- */}
           <View style={styles.scanRow}>
             <Pressable
               style={({ pressed }) => [
                 styles.scanBtn,
                 (isScanning || pressed) && styles.scanBtnPressed,
               ]}
-              onPress={scan}
+              onPress={pickFromGallery}
               disabled={isScanning || submitting}
             >
               {isScanning ? (
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
-                <Text style={styles.scanBtnText}>📷 Scan receipt</Text>
+                <Text style={styles.scanBtnText}>🖼 Upload receipt</Text>
               )}
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.cameraBtn,
+                (isScanning || pressed) && styles.scanBtnPressed,
+              ]}
+              onPress={captureFromCamera}
+              disabled={isScanning || submitting}
+            >
+              <Text style={styles.scanBtnText}>📷 Camera</Text>
             </Pressable>
             {remaining > 0 ? (
               <View style={styles.badge}>
@@ -584,6 +594,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   scanBtnPressed: { opacity: 0.8 },
+  cameraBtn: {
+    backgroundColor: '#16a34a',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   scanBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
   badge: {
     backgroundColor: '#fef3c7', // amber-100

@@ -10,28 +10,15 @@ import { parseReceipt } from '@splitmate/ocr-parser';
  *
  *   idle → picking → processing → done | failed
  *
- * Transitions:
- *   scan()  : idle → picking (launches image picker)
- *   success : picking → processing (ML Kit recognizing) → done (draft ready)
- *   error   : any → failed (with human-readable reason)
- *   reset() : any → idle
+ * Two entry points:
+ *   pickFromGallery() — open photo library, pick a saved receipt image
+ *   captureFromCamera() — launch camera to photograph a physical receipt
+ *
+ * Both paths feed the image URI into ML Kit → parser → ParsedBillDraft.
  *
  * Web guard:
- *   ML Kit (`@react-native-ml-kit/text-recognition`) is a native iOS/Android
- *   module. On web the import resolves (the JS wrapper loads fine from
- *   react-native-web) but the underlying NativeModule is undefined. The
- *   Platform.OS check returns 'failed' before any ML Kit call, so the
- *   web bundle never crashes.
- *
- * Expo dev client requirement:
- *   `@react-native-ml-kit/text-recognition` ships native code that is NOT
- *   included in stock Expo Go. You must build a custom dev client:
- *     cd apps/mobile
- *     npx expo prebuild            # generates ios/ and android/ folders
- *     npx expo run:ios             # builds + installs dev client on iOS sim
- *     npx expo run:android         # builds + installs dev client on Android emu
- *   After the first build, subsequent code changes hot-reload via Metro as
- *   usual — you only rebuild when native deps change.
+ *   ML Kit is native-only. On web both methods immediately return 'failed'
+ *   with a clear message. The web bundle never crashes.
  */
 
 export type OcrScanState =
@@ -44,8 +31,54 @@ export type OcrScanState =
 export function useOcrScanner(country: Country, billType: BillType) {
   const [state, setState] = useState<OcrScanState>({ status: 'idle' });
 
-  const scan = useCallback(async () => {
-    // ---- Web guard ----
+  /**
+   * Shared OCR pipeline: takes an image URI, runs ML Kit + parser.
+   * Called by both gallery and camera paths after an image is obtained.
+   */
+  const processImage = useCallback(
+    async (imageUri: string) => {
+      setState({ status: 'processing' });
+
+      try {
+        const mlkitResult = await TextRecognition.recognize(imageUri);
+
+        const rawLines: RawLine[] = mlkitResult.blocks
+          .flatMap((block) => block.lines)
+          .map((line, position) => ({
+            text: line.text,
+            position,
+            boundingBox: line.frame
+              ? {
+                  x: line.frame.left,
+                  y: line.frame.top,
+                  width: line.frame.width,
+                  height: line.frame.height,
+                }
+              : undefined,
+          }));
+
+        if (rawLines.length === 0) {
+          setState({ status: 'failed', reason: 'No text detected in image.' });
+          return;
+        }
+
+        const draft = parseReceipt({ lines: rawLines, country, billType });
+        setState({ status: 'done', draft, imageUri });
+      } catch (err) {
+        setState({
+          status: 'failed',
+          reason: err instanceof Error ? err.message : 'OCR processing failed.',
+        });
+      }
+    },
+    [country, billType],
+  );
+
+  /**
+   * Pick a receipt image from the photo library.
+   * Best for: saved screenshots, emailed receipts, downloaded images.
+   */
+  const pickFromGallery = useCallback(async () => {
     if (Platform.OS === 'web') {
       setState({
         status: 'failed',
@@ -57,14 +90,12 @@ export function useOcrScanner(country: Country, billType: BillType) {
     setState({ status: 'picking' });
 
     try {
-      // Request photo library permission
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         setState({ status: 'failed', reason: 'Photo library permission denied.' });
         return;
       }
 
-      // Launch picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 1,
@@ -72,50 +103,66 @@ export function useOcrScanner(country: Country, billType: BillType) {
       });
 
       if (result.canceled || result.assets.length === 0) {
-        setState({ status: 'idle' }); // user cancelled — back to idle, not failed
+        setState({ status: 'idle' });
         return;
       }
 
-      const imageUri = result.assets[0]!.uri;
-      setState({ status: 'processing' });
-
-      // Run ML Kit text recognition on-device
-      const mlkitResult = await TextRecognition.recognize(imageUri);
-
-      // Flatten ML Kit's block → line hierarchy into RawLine[]
-      const rawLines: RawLine[] = mlkitResult.blocks
-        .flatMap((block) => block.lines)
-        .map((line, position) => ({
-          text: line.text,
-          position,
-          boundingBox: line.frame
-            ? {
-                x: line.frame.left,
-                y: line.frame.top,
-                width: line.frame.width,
-                height: line.frame.height,
-              }
-            : undefined,
-        }));
-
-      if (rawLines.length === 0) {
-        setState({ status: 'failed', reason: 'No text detected in image.' });
-        return;
-      }
-
-      // Run through the parser pipeline (Phase 11)
-      const draft = parseReceipt({ lines: rawLines, country, billType });
-
-      setState({ status: 'done', draft, imageUri });
+      await processImage(result.assets[0]!.uri);
     } catch (err) {
       setState({
         status: 'failed',
-        reason: err instanceof Error ? err.message : 'OCR scan failed.',
+        reason: err instanceof Error ? err.message : 'Failed to pick image.',
       });
     }
-  }, [country, billType]);
+  }, [processImage]);
+
+  /**
+   * Capture a receipt photo using the device camera.
+   * Best for: photographing a physical paper receipt at a restaurant.
+   */
+  const captureFromCamera = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      setState({
+        status: 'failed',
+        reason: 'Camera capture is unavailable on web. Please use iOS or Android.',
+      });
+      return;
+    }
+
+    setState({ status: 'picking' });
+
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setState({ status: 'failed', reason: 'Camera permission denied.' });
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || result.assets.length === 0) {
+        setState({ status: 'idle' });
+        return;
+      }
+
+      await processImage(result.assets[0]!.uri);
+    } catch (err) {
+      setState({
+        status: 'failed',
+        reason: err instanceof Error ? err.message : 'Failed to capture image.',
+      });
+    }
+  }, [processImage]);
+
+  // Legacy alias: `scan` maps to gallery pick for backward compatibility
+  // with bill-entry.tsx which calls `scan()`.
+  const scan = pickFromGallery;
 
   const reset = useCallback(() => setState({ status: 'idle' }), []);
 
-  return { state, scan, reset };
+  return { state, scan, pickFromGallery, captureFromCamera, reset };
 }

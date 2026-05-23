@@ -1,7 +1,8 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,15 +12,17 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import type { AllocationRule, BillType, ChargeType } from '@splitmate/types';
+import type { AllocationRule, BillType, ChargeType, Country, ParsedBillDraft } from '@splitmate/types';
 import { formatAmount } from '@splitmate/split-engine';
 import { useAuth } from '@/hooks/useAuth';
 import { createBill, type BillChargeInput, type BillItemInput } from '@/hooks/useBills';
 import { useGroup, useGroupMembers } from '@/hooks/useGroups';
+import { useOcrScanner, type OcrScanState } from '@/hooks/useOcrScanner';
+import { useFlaggedFields } from '@/hooks/useFlaggedFields';
+import { FlaggedFieldHighlight } from '@/components/FlaggedFieldHighlight';
+import { markReceiptDone } from '@/hooks/useReceiptAsset';
 
-// Phase 13 (MLE) will attach the OCR scan button here; for now it's a manual form.
-// The form state shape (items[], charges[], includedUserIds, paidBy) is the
-// hook point: when OCR lands, it pre-fills these arrays before the user reviews.
+// --- Constants --------------------------------------------------------------
 
 const BILL_TYPES: Array<{ value: BillType; label: string }> = [
   { value: 'restaurant', label: 'Restaurant' },
@@ -55,29 +58,24 @@ type ChargeRow = {
 function genKey() {
   return Math.random().toString(36).slice(2, 10);
 }
-
 function emptyItem(): ItemRow {
   return { key: genKey(), name: '', quantity: '1', unitPrice: '' };
 }
-
 function emptyCharge(): ChargeRow {
-  return {
-    key: genKey(),
-    type: 'tax',
-    label: 'Tax',
-    amount: '',
-    allocationRule: 'proportional_subtotal',
-  };
+  return { key: genKey(), type: 'tax', label: 'Tax', amount: '', allocationRule: 'proportional_subtotal' };
 }
-
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
-
 function parseNum(s: string): number {
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : 0;
 }
+function defaultRuleFor(type: ChargeType): AllocationRule {
+  return CHARGE_TYPE_OPTIONS.find((o) => o.value === type)?.defaultRule ?? 'equal_per_person';
+}
+
+// --- Screen -----------------------------------------------------------------
 
 export default function BillEntryScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -96,13 +94,70 @@ export default function BillEntryScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initial selection: include all members, payer defaults to current user.
+  // ---- OCR scanning state ---------------------------------------------------
+  const country = (group?.country ?? 'US') as Country;
+  const { state: scanState, scan, reset: resetScan } = useOcrScanner(country, billType);
+  const { isFlagged, confirm, remaining, reset: resetFlags, flaggedSet } = useFlaggedFields();
+  const [scanImageUri, setScanImageUri] = useState<string | null>(null);
+
+  // When OCR produces a draft, prefill the form and seed flagged fields.
+  const handleScanDone = useCallback(
+    (draft: ParsedBillDraft, imageUri: string) => {
+      if (draft.merchant.name) setTitle(draft.merchant.name);
+      if (draft.date) setDate(draft.date);
+      if (draft.billType) setBillType(draft.billType);
+
+      if (draft.items.length > 0) {
+        setItems(
+          draft.items.map((it) => ({
+            key: genKey(),
+            name: it.name,
+            quantity: String(it.quantity),
+            unitPrice: String(it.unitPrice),
+          })),
+        );
+      }
+
+      if (draft.charges.length > 0) {
+        setCharges(
+          draft.charges.map((c) => ({
+            key: genKey(),
+            type: c.type,
+            label: c.label ?? c.type,
+            amount: String(Math.abs(c.amount)),
+            allocationRule: defaultRuleFor(c.type),
+          })),
+        );
+      }
+
+      resetFlags(draft.flaggedFields);
+      setScanImageUri(imageUri);
+      resetScan();
+    },
+    [resetFlags, resetScan],
+  );
+
+  // Effect: react to scan state changes.
+  useEffect(() => {
+    if (scanState.status === 'done') {
+      handleScanDone(scanState.draft, scanState.imageUri);
+    }
+    if (scanState.status === 'failed') {
+      const msg = scanState.reason;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Scan failed', msg);
+      resetScan();
+    }
+  }, [scanState, handleScanDone, resetScan]);
+
+  // ---- Member initialization ------------------------------------------------
   const initialized = members.length > 0 && includedUserIds.size === 0;
   if (initialized) {
     setIncludedUserIds(new Set(members.map((m) => m.userId)));
     if (!paidBy && user) setPaidBy(user.id);
   }
 
+  // ---- Computed total -------------------------------------------------------
   const total = useMemo(() => {
     const itemSum = items.reduce((s, i) => s + parseNum(i.quantity) * parseNum(i.unitPrice), 0);
     const chargeSum = charges.reduce((s, c) => {
@@ -112,14 +167,17 @@ export default function BillEntryScreen() {
     return Math.round((itemSum + chargeSum) * 100) / 100;
   }, [items, charges]);
 
-  function updateItem(key: string, patch: Partial<ItemRow>) {
+  // ---- Field helpers (with auto-confirm on edit) ----------------------------
+  function updateItem(key: string, patch: Partial<ItemRow>, field?: string) {
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+    if (field) confirm(field);
   }
   function removeItem(key: string) {
     setItems((prev) => prev.filter((it) => it.key !== key));
   }
-  function updateCharge(key: string, patch: Partial<ChargeRow>) {
+  function updateCharge(key: string, patch: Partial<ChargeRow>, field?: string) {
     setCharges((prev) => prev.map((c) => (c.key === key ? { ...c, ...patch } : c)));
+    if (field) confirm(field);
   }
   function removeCharge(key: string) {
     setCharges((prev) => prev.filter((c) => c.key !== key));
@@ -133,6 +191,7 @@ export default function BillEntryScreen() {
     });
   }
 
+  // ---- Submit ---------------------------------------------------------------
   async function handleSubmit() {
     setError(null);
     if (!groupId || !group || !paidBy) {
@@ -178,6 +237,17 @@ export default function BillEntryScreen() {
       charges: cleanCharges,
       includedUserIds: Array.from(includedUserIds),
     });
+
+    // If we had a scan, persist parse_metadata to receipt_assets.
+    if (result.ok && scanImageUri) {
+      await markReceiptDone(result.expenseId, {
+        confidenceScores: Object.fromEntries([...flaggedSet].map((f) => [f, 0.5])),
+        flaggedFields: [...flaggedSet],
+        itemCount: cleanItems.length,
+        chargeCount: cleanCharges.length,
+      }).catch(() => {}); // best-effort; don't block the flow
+    }
+
     setSubmitting(false);
 
     if (!result.ok) {
@@ -190,6 +260,7 @@ export default function BillEntryScreen() {
     });
   }
 
+  // ---- Render ---------------------------------------------------------------
   if (!group) {
     return (
       <View style={styles.centered}>
@@ -199,6 +270,7 @@ export default function BillEntryScreen() {
   }
 
   const currency = group.currency;
+  const isScanning = scanState.status === 'picking' || scanState.status === 'processing';
 
   return (
     <>
@@ -208,28 +280,69 @@ export default function BillEntryScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Basics */}
+          {/* ---- Scan button + badge ---- */}
+          <View style={styles.scanRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.scanBtn,
+                (isScanning || pressed) && styles.scanBtnPressed,
+              ]}
+              onPress={scan}
+              disabled={isScanning || submitting}
+            >
+              {isScanning ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.scanBtnText}>📷 Scan receipt</Text>
+              )}
+            </Pressable>
+            {remaining > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {remaining} field{remaining === 1 ? '' : 's'} need review
+                </Text>
+              </View>
+            ) : scanImageUri ? (
+              <View style={[styles.badge, styles.badgeGreen]}>
+                <Text style={[styles.badgeText, styles.badgeTextGreen]}>
+                  ✓ All fields confirmed
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* ---- Basics ---- */}
           <View style={styles.card}>
             <Text style={styles.sectionLabel}>Title</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Dinner at Olive"
-              placeholderTextColor="#9ca3af"
-              value={title}
-              onChangeText={setTitle}
-              editable={!submitting}
-            />
+            <FlaggedFieldHighlight flagged={isFlagged('merchant.name')} label="Merchant uncertain">
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Dinner at Olive"
+                placeholderTextColor="#9ca3af"
+                value={title}
+                onChangeText={(v) => {
+                  setTitle(v);
+                  confirm('merchant.name');
+                }}
+                editable={!submitting}
+              />
+            </FlaggedFieldHighlight>
 
             <Text style={styles.sectionLabel}>Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#9ca3af"
-              value={date}
-              onChangeText={setDate}
-              editable={!submitting}
-              autoCapitalize="none"
-            />
+            <FlaggedFieldHighlight flagged={isFlagged('date')} label="Date uncertain">
+              <TextInput
+                style={styles.input}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#9ca3af"
+                value={date}
+                onChangeText={(v) => {
+                  setDate(v);
+                  confirm('date');
+                }}
+                editable={!submitting}
+                autoCapitalize="none"
+              />
+            </FlaggedFieldHighlight>
 
             <Text style={styles.sectionLabel}>Bill type</Text>
             <View style={styles.chipRow}>
@@ -248,7 +361,7 @@ export default function BillEntryScreen() {
             </View>
           </View>
 
-          {/* Items */}
+          {/* ---- Items ---- */}
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Items</Text>
@@ -263,47 +376,54 @@ export default function BillEntryScreen() {
             {items.length === 0 ? (
               <Text style={styles.sectionHint}>No items yet.</Text>
             ) : (
-              items.map((it) => (
-                <View key={it.key} style={styles.itemRow}>
-                  <TextInput
-                    style={[styles.itemInputName]}
-                    placeholder="Item name"
-                    placeholderTextColor="#9ca3af"
-                    value={it.name}
-                    onChangeText={(v) => updateItem(it.key, { name: v })}
-                    editable={!submitting}
-                  />
-                  <TextInput
-                    style={styles.itemInputQty}
-                    placeholder="Qty"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="decimal-pad"
-                    value={it.quantity}
-                    onChangeText={(v) => updateItem(it.key, { quantity: v })}
-                    editable={!submitting}
-                  />
-                  <TextInput
-                    style={styles.itemInputPrice}
-                    placeholder="Price"
-                    placeholderTextColor="#9ca3af"
-                    keyboardType="decimal-pad"
-                    value={it.unitPrice}
-                    onChangeText={(v) => updateItem(it.key, { unitPrice: v })}
-                    editable={!submitting}
-                  />
-                  <Pressable
-                    style={styles.removeBtn}
-                    onPress={() => removeItem(it.key)}
-                    disabled={submitting}
-                  >
-                    <Text style={styles.removeBtnText}>×</Text>
-                  </Pressable>
-                </View>
-              ))
+              items.map((it, idx) => {
+                const nameField = `items[${idx}].name`;
+                const priceField = `items[${idx}].unitPrice`;
+                const rowFlagged = isFlagged(nameField) || isFlagged(priceField);
+                return (
+                  <FlaggedFieldHighlight key={it.key} flagged={rowFlagged} label={`Item ${idx + 1}`}>
+                    <View style={styles.itemRow}>
+                      <TextInput
+                        style={[styles.itemInputName]}
+                        placeholder="Item name"
+                        placeholderTextColor="#9ca3af"
+                        value={it.name}
+                        onChangeText={(v) => updateItem(it.key, { name: v }, nameField)}
+                        editable={!submitting}
+                      />
+                      <TextInput
+                        style={styles.itemInputQty}
+                        placeholder="Qty"
+                        placeholderTextColor="#9ca3af"
+                        keyboardType="decimal-pad"
+                        value={it.quantity}
+                        onChangeText={(v) => updateItem(it.key, { quantity: v })}
+                        editable={!submitting}
+                      />
+                      <TextInput
+                        style={styles.itemInputPrice}
+                        placeholder="Price"
+                        placeholderTextColor="#9ca3af"
+                        keyboardType="decimal-pad"
+                        value={it.unitPrice}
+                        onChangeText={(v) => updateItem(it.key, { unitPrice: v }, priceField)}
+                        editable={!submitting}
+                      />
+                      <Pressable
+                        style={styles.removeBtn}
+                        onPress={() => removeItem(it.key)}
+                        disabled={submitting}
+                      >
+                        <Text style={styles.removeBtnText}>×</Text>
+                      </Pressable>
+                    </View>
+                  </FlaggedFieldHighlight>
+                );
+              })
             )}
           </View>
 
-          {/* Charges */}
+          {/* ---- Charges ---- */}
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Charges &amp; taxes</Text>
@@ -318,57 +438,62 @@ export default function BillEntryScreen() {
             {charges.length === 0 ? (
               <Text style={styles.sectionHint}>No taxes, tips, or fees added.</Text>
             ) : (
-              charges.map((c) => (
-                <View key={c.key} style={styles.chargeRow}>
-                  <View style={styles.chargeTypeRow}>
-                    {CHARGE_TYPE_OPTIONS.map((opt) => (
-                      <Pressable
-                        key={opt.value}
-                        style={[styles.chip, c.type === opt.value && styles.chipActive]}
-                        onPress={() =>
-                          updateCharge(c.key, {
-                            type: opt.value,
-                            label: opt.label,
-                            allocationRule: opt.defaultRule,
-                          })
-                        }
-                        disabled={submitting}
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            c.type === opt.value && styles.chipTextActive,
-                          ]}
+              charges.map((c, idx) => {
+                const amountField = `charges[${idx}].amount`;
+                return (
+                  <FlaggedFieldHighlight key={c.key} flagged={isFlagged(amountField)} label={c.label}>
+                    <View style={styles.chargeRow}>
+                      <View style={styles.chargeTypeRow}>
+                        {CHARGE_TYPE_OPTIONS.map((opt) => (
+                          <Pressable
+                            key={opt.value}
+                            style={[styles.chip, c.type === opt.value && styles.chipActive]}
+                            onPress={() =>
+                              updateCharge(c.key, {
+                                type: opt.value,
+                                label: opt.label,
+                                allocationRule: opt.defaultRule,
+                              })
+                            }
+                            disabled={submitting}
+                          >
+                            <Text
+                              style={[
+                                styles.chipText,
+                                c.type === opt.value && styles.chipTextActive,
+                              ]}
+                            >
+                              {opt.label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                      <View style={styles.chargeInputRow}>
+                        <TextInput
+                          style={[styles.input, { flex: 1 }]}
+                          placeholder="Amount"
+                          placeholderTextColor="#9ca3af"
+                          keyboardType="decimal-pad"
+                          value={c.amount}
+                          onChangeText={(v) => updateCharge(c.key, { amount: v }, amountField)}
+                          editable={!submitting}
+                        />
+                        <Pressable
+                          style={styles.removeBtn}
+                          onPress={() => removeCharge(c.key)}
+                          disabled={submitting}
                         >
-                          {opt.label}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  <View style={styles.chargeInputRow}>
-                    <TextInput
-                      style={[styles.input, { flex: 1 }]}
-                      placeholder="Amount"
-                      placeholderTextColor="#9ca3af"
-                      keyboardType="decimal-pad"
-                      value={c.amount}
-                      onChangeText={(v) => updateCharge(c.key, { amount: v })}
-                      editable={!submitting}
-                    />
-                    <Pressable
-                      style={styles.removeBtn}
-                      onPress={() => removeCharge(c.key)}
-                      disabled={submitting}
-                    >
-                      <Text style={styles.removeBtnText}>×</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))
+                          <Text style={styles.removeBtnText}>×</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </FlaggedFieldHighlight>
+                );
+              })
             )}
           </View>
 
-          {/* Members */}
+          {/* ---- Members ---- */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Who's on this bill?</Text>
             <Text style={styles.sectionHint}>Tap to toggle. The payer must be included.</Text>
@@ -406,11 +531,13 @@ export default function BillEntryScreen() {
             </View>
           </View>
 
-          {/* Total */}
-          <View style={styles.totalCard}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>{formatAmount(total, currency)}</Text>
-          </View>
+          {/* ---- Total ---- */}
+          <FlaggedFieldHighlight flagged={isFlagged('total')} label="Total uncertain — verify items">
+            <View style={styles.totalCard}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalAmount}>{formatAmount(total, currency)}</Text>
+            </View>
+          </FlaggedFieldHighlight>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -434,15 +561,40 @@ export default function BillEntryScreen() {
   );
 }
 
+// --- Styles -----------------------------------------------------------------
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   scroll: { padding: 16, gap: 12 },
-  centered: {
-    flex: 1,
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' },
+
+  scanRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f9fafb',
+    gap: 10,
+    flexWrap: 'wrap',
   },
+  scanBtn: {
+    backgroundColor: '#7c3aed', // purple-600
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  scanBtnPressed: { opacity: 0.8 },
+  scanBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '600' },
+  badge: {
+    backgroundColor: '#fef3c7', // amber-100
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  badgeText: { color: '#92400e', fontSize: 12, fontWeight: '600' },
+  badgeGreen: { backgroundColor: '#dcfce7' }, // green-100
+  badgeTextGreen: { color: '#166534' }, // green-800
+
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -457,11 +609,7 @@ const styles = StyleSheet.create({
   sectionLabel: { fontSize: 13, fontWeight: '600', color: '#374151' },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#111111' },
   sectionHint: { fontSize: 13, color: '#6b7280' },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   linkBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   linkBtnText: { color: '#16a34a', fontWeight: '600' },
 
@@ -491,44 +639,20 @@ const styles = StyleSheet.create({
 
   itemRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   itemInputName: {
-    flex: 2,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#111111',
+    flex: 2, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10,
+    paddingHorizontal: 10, paddingVertical: 10, fontSize: 15, color: '#111111',
   },
   itemInputQty: {
-    flex: 0.5,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#111111',
-    textAlign: 'center',
+    flex: 0.5, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 10, fontSize: 15, color: '#111111', textAlign: 'center',
   },
   itemInputPrice: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#111111',
-    textAlign: 'right',
+    flex: 1, borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 10, fontSize: 15, color: '#111111', textAlign: 'right',
   },
   removeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f3f4f6',
+    width: 32, height: 32, borderRadius: 16, alignItems: 'center',
+    justifyContent: 'center', backgroundColor: '#f3f4f6',
   },
   removeBtnText: { fontSize: 18, color: '#6b7280' },
 
@@ -536,41 +660,25 @@ const styles = StyleSheet.create({
   chargeTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chargeInputRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
 
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
+  memberRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   memberToggle: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    backgroundColor: '#ffffff',
+    flex: 1, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10,
+    borderWidth: 1, borderColor: '#d1d5db', backgroundColor: '#ffffff',
   },
   memberToggleOn: { backgroundColor: '#f0fdf4', borderColor: '#16a34a' },
   memberToggleText: { color: '#6b7280' },
   memberToggleTextOn: { color: '#111111', fontWeight: '600' },
   payerToggle: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8,
+    borderWidth: 1, borderColor: '#d1d5db',
   },
   payerToggleOn: { backgroundColor: '#16a34a', borderColor: '#16a34a' },
   payerToggleText: { color: '#6b7280', fontSize: 12 },
   payerToggleTextOn: { color: '#ffffff', fontWeight: '600' },
 
   totalCard: {
-    backgroundColor: '#111111',
-    borderRadius: 16,
-    padding: 18,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#111111', borderRadius: 16, padding: 18,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
   totalLabel: { color: '#9ca3af', fontSize: 14 },
   totalAmount: { color: '#ffffff', fontSize: 22, fontWeight: '700' },
@@ -578,11 +686,8 @@ const styles = StyleSheet.create({
   error: { color: '#dc2626', fontSize: 14, textAlign: 'center' },
 
   primaryBtn: {
-    backgroundColor: '#16a34a',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 14,
+    alignItems: 'center', marginBottom: 20,
   },
   primaryBtnPressed: { opacity: 0.85 },
   primaryBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '600' },

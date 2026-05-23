@@ -88,6 +88,44 @@ export async function uploadReceipt(input: UploadReceiptInput): Promise<UploadRe
 }
 
 /**
+ * After a successful scan + bill creation, write parse_metadata back
+ * to the receipt_assets row for the expense. If no receipt_assets row
+ * exists yet (manual entry without upload), this is a no-op.
+ */
+export type ParseMetadata = {
+  confidenceScores: Record<string, number>;
+  flaggedFields: string[];
+  itemCount: number;
+  chargeCount: number;
+};
+
+export async function markReceiptDone(
+  expenseId: string,
+  metadata: ParseMetadata,
+): Promise<void> {
+  await supabase
+    .from('receipt_assets')
+    .update({
+      parse_status: 'done',
+      parse_metadata: metadata,
+    })
+    .eq('expense_id', expenseId);
+}
+
+export async function markReceiptFailed(
+  expenseId: string,
+  reason: string,
+): Promise<void> {
+  await supabase
+    .from('receipt_assets')
+    .update({
+      parse_status: 'failed',
+      parse_metadata: { error: reason },
+    })
+    .eq('expense_id', expenseId);
+}
+
+/**
  * Generate a short-lived signed URL for viewing a receipt. Useful for
  * rendering a thumbnail in bill detail (private bucket -- can't use a
  * public URL). Default TTL is 1 hour.
